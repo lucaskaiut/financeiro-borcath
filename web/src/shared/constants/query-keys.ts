@@ -14,37 +14,4 @@ export const queryKeys = {
     list: (params: ListParams) => ['roles', 'list', params] as const,
     detail: (id: number) => ['roles', 'detail', id] as const,
   },
-
-  apiTokens: {
-    all: ['api-tokens'] as const,
-    list: () => ['api-tokens', 'list'] as const,
-  },
-
-  webhooks: {
-    all: ['webhooks'] as const,
-    list: () => ['webhooks', 'list'] as const,
-    detail: (id: number) => ['webhooks', 'detail', id] as const,
-    logs: (id: number) => ['webhooks', 'logs', id] as const,
-    events: () => ['webhooks', 'events'] as const,
-  },
-
-  billing: {
-    all: ['billing'] as const,
-    plans: {
-      all: ['billing', 'plans'] as const,
-      list: () => ['billing', 'plans', 'list'] as const,
-      detail: (id: string) => ['billing', 'plans', 'detail', id] as const,
-      catalog: () => ['billing', 'plans', 'catalog'] as const,
-    },
-    subscription: {
-      current: () => ['billing', 'subscription'] as const,
-    },
-    gateways: {
-      list: () => ['billing', 'gateways'] as const,
-    },
-    invoices: {
-      list: () => ['billing', 'invoices', 'list'] as const,
-      detail: (id: string) => ['billing', 'invoices', 'detail', id] as const,
-    },
-  },
 } as const

@@ -3,9 +3,6 @@
 namespace App\Modules\Tenant\Models;
 
 use App\Modules\ACL\Models\Role;
-use App\Modules\ApiToken\Models\ApiToken;
-use App\Modules\Billing\Models\Plan;
-use App\Modules\Billing\Models\Subscription;
 use App\Modules\Shared\Models\Concerns\HasUuid;
 use App\Modules\User\Models\User;
 use Database\Factories\TenantFactory;
@@ -13,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Tenant extends Model
 {
@@ -49,21 +45,6 @@ class Tenant extends Model
     public function roles(): HasMany
     {
         return $this->hasMany(Role::class);
-    }
-
-    public function apiTokens(): HasMany
-    {
-        return $this->hasMany(ApiToken::class);
-    }
-
-    public function plans(): HasMany
-    {
-        return $this->hasMany(Plan::class);
-    }
-
-    public function subscription(): HasOne
-    {
-        return $this->hasOne(Subscription::class);
     }
 
     public function isUmbrella(): bool

@@ -1,16 +1,13 @@
 import { Controller, useFormContext } from 'react-hook-form'
 import { Checkbox, Field } from '@/shared/design-system'
-import { getPermissionGroups, type Permission } from '@/shared/constants/permissions'
-import { useIsUmbrellaTenant } from '@/shared/hooks/useIsUmbrellaTenant'
+import { PERMISSION_GROUPS, type Permission } from '@/shared/constants/permissions'
 
 /**
  * Seleção de permissões em grupos de checkboxes, com "selecionar tudo" por grupo.
- * Permissões de planos só aparecem para tenants umbrella (raiz / sem parent_id).
  */
 export function PermissionsField({ name = 'permissions' }: { name?: string }) {
   const { control } = useFormContext()
-  const isUmbrella = useIsUmbrellaTenant()
-  const groups = getPermissionGroups({ includePlanPermissions: isUmbrella })
+  const groups = PERMISSION_GROUPS
 
   return (
     <Controller

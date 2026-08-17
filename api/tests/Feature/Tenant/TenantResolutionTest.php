@@ -2,11 +2,9 @@
 
 namespace Tests\Feature\Tenant;
 
-use App\Modules\ApiToken\Models\ApiToken;
 use App\Modules\Tenant\Support\Facades\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\InteractsWithTenants;
 use Tests\TestCase;
@@ -40,38 +38,6 @@ class TenantResolutionTest extends TestCase
             ->assertOk()
             ->assertJsonPath('resolved', true)
             ->assertJsonPath('tenant_uuid', $tenant->uuid);
-    }
-
-    public function test_resolves_tenant_from_api_token(): void
-    {
-        $tenant = $this->createTenantWithRoles();
-
-        $plain = ApiToken::PREFIX.Str::random(48);
-        ApiToken::factory()->for($tenant)->create(['token_hash' => ApiToken::hash($plain)]);
-
-        $this->forgetTenantContext();
-
-        $this->getJson('/api/testing/current-tenant', ['Authorization' => "Bearer {$plain}"])
-            ->assertOk()
-            ->assertJsonPath('resolved', true)
-            ->assertJsonPath('tenant_uuid', $tenant->uuid);
-    }
-
-    public function test_expired_api_token_does_not_resolve_tenant(): void
-    {
-        $tenant = $this->createTenantWithRoles();
-
-        $plain = ApiToken::PREFIX.Str::random(48);
-        ApiToken::factory()->for($tenant)->create([
-            'token_hash' => ApiToken::hash($plain),
-            'expires_at' => now()->subMinute(),
-        ]);
-
-        $this->forgetTenantContext();
-
-        $this->getJson('/api/testing/current-tenant', ['Authorization' => "Bearer {$plain}"])
-            ->assertNotFound()
-            ->assertJsonPath('success', false);
     }
 
     public function test_resolves_tenant_from_referer_header(): void

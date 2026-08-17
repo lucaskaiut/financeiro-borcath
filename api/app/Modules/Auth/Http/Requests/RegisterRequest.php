@@ -2,16 +2,11 @@
 
 namespace App\Modules\Auth\Http\Requests;
 
-use App\Modules\Billing\Models\Plan;
-use App\Modules\Billing\Support\PaymentDataRules;
-use App\Modules\Billing\Support\PaymentGatewayResolver;
 use App\Modules\Shared\Rules\Cpf;
 use App\Modules\Shared\Rules\CpfOrCnpj;
-use App\Modules\Tenant\Models\Tenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
@@ -25,8 +20,6 @@ class RegisterRequest extends FormRequest
      */
     public function rules(): array
     {
-        $plansRequired = $this->publicPlansExist();
-
         return [
             'tenant' => ['required', 'array'],
             'tenant.name' => ['required', 'string', 'max:255'],
@@ -45,20 +38,6 @@ class RegisterRequest extends FormRequest
             'user.phone' => ['nullable', 'string', 'max:20'],
             'user.document' => ['nullable', 'string', new Cpf],
             'user.password' => ['required', 'string', 'min:8', 'max:255'],
-
-            'plan_id' => [
-                Rule::requiredIf($plansRequired),
-                'nullable',
-                'string',
-                'uuid',
-                'exists:plans,uuid',
-            ],
-            'payment_gateway' => [
-                'nullable',
-                'string',
-                Rule::in(app(PaymentGatewayResolver::class)->activeKeys()),
-            ],
-            ...PaymentDataRules::validationRules(),
         ];
     }
 
@@ -87,15 +66,6 @@ class RegisterRequest extends FormRequest
             Arr::set($input, 'user.document', isset($user['document']) && $user['document'] !== ''
                 ? preg_replace('/\D+/', '', (string) $user['document'])
                 : (strlen($document) === 11 ? $document : null));
-
-            if (Arr::has($input, 'subscription.plan_id')) {
-                Arr::set($input, 'plan_id', Arr::get($input, 'subscription.plan_id'));
-            }
-
-            if (Arr::has($input, 'payment.method') && filled(Arr::get($input, 'payment.method'))) {
-                Arr::set($input, 'payment_gateway', Arr::get($input, 'payment.method'));
-                Arr::set($input, 'payment_data', Arr::get($input, 'payment.data', []));
-            }
         }
 
         if (Arr::has($input, 'tenant.document')) {
@@ -111,21 +81,6 @@ class RegisterRequest extends FormRequest
         }
 
         $this->replace($input);
-    }
-
-    private function publicPlansExist(): bool
-    {
-        $rootId = Tenant::query()->orderBy('id')->value('id');
-
-        if ($rootId === null) {
-            return false;
-        }
-
-        return Plan::query()
-            ->withoutTenancy()
-            ->where('tenant_id', $rootId)
-            ->where('active', true)
-            ->exists();
     }
 
     private function generateDomain(string $name): string

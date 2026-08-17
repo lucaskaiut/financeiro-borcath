@@ -3,7 +3,6 @@
 namespace App\Modules\Tenant\Providers;
 
 use App\Modules\Tenant\Resolution\Contracts\TenantResolverInterface;
-use App\Modules\Tenant\Resolution\Strategies\ApiTokenStrategy;
 use App\Modules\Tenant\Resolution\Strategies\AuthenticatedUserStrategy;
 use App\Modules\Tenant\Resolution\Strategies\RefererStrategy;
 use App\Modules\Tenant\Resolution\TenantResolver;
@@ -23,7 +22,6 @@ class TenantServiceProvider extends ServiceProvider
             return new TenantResolver(
                 [
                     $app->make(AuthenticatedUserStrategy::class),
-                    $app->make(ApiTokenStrategy::class),
                     $app->make(RefererStrategy::class),
                 ],
                 $app->make(CurrentTenant::class),

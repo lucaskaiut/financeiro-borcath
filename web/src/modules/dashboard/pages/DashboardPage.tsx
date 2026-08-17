@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Building2, Globe, KeyRound, ShieldCheck, Users } from 'lucide-react'
+import { Building2, Globe, ShieldCheck, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import {
   Badge,
@@ -101,13 +101,6 @@ export default function DashboardPage() {
             stat={stats.roles}
             to="/roles"
             accent="bg-success-soft text-success"
-          />
-          <StatCard
-            label="Tokens de API"
-            icon={KeyRound}
-            stat={stats.apiTokens}
-            to="/api-tokens"
-            accent="bg-warning-soft text-warning"
           />
         </div>
       </PageContent>

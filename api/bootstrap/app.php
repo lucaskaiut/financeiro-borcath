@@ -1,13 +1,9 @@
 <?php
 
 use App\Modules\ACL\Http\Middleware\EnsurePermission;
-use App\Modules\ApiToken\Http\Middleware\AuthenticateApiToken;
-use App\Modules\ApiToken\Http\Middleware\MultiAuthenticate;
-use App\Modules\Billing\Http\Middleware\EnsureActiveSubscription;
 use App\Modules\Shared\Http\ApiError;
 use App\Modules\Tenant\Exceptions\TenantAccessForbidden;
 use App\Modules\Tenant\Exceptions\TenantCouldNotBeResolved;
-use App\Modules\Tenant\Http\Middleware\EnsureChildTenant;
 use App\Modules\Tenant\Http\Middleware\ResolveTenant;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -30,29 +26,17 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withEvents(discover: [
-        __DIR__.'/../app/Modules/Webhook/Listeners',
-    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
 
         $middleware->alias([
             'tenant' => ResolveTenant::class,
             'permission' => EnsurePermission::class,
-            'auth.api-token' => AuthenticateApiToken::class,
-            'auth.multi' => MultiAuthenticate::class,
-            'subscription.active' => EnsureActiveSubscription::class,
-            'tenant.child' => EnsureChildTenant::class,
         ]);
 
         $middleware->prependToPriorityList(
             SubstituteBindings::class,
             ResolveTenant::class,
-        );
-
-        $middleware->prependToPriorityList(
-            ResolveTenant::class,
-            MultiAuthenticate::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {

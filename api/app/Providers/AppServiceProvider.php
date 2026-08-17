@@ -4,20 +4,10 @@ namespace App\Providers;
 
 use App\Modules\ACL\Models\Role;
 use App\Modules\ACL\Policies\RolePolicy;
-use App\Modules\ApiToken\Models\ApiToken;
-use App\Modules\ApiToken\Policies\ApiTokenPolicy;
-use App\Modules\Billing\Models\Invoice;
-use App\Modules\Billing\Models\Plan;
-use App\Modules\Billing\Models\Subscription;
-use App\Modules\Billing\Policies\InvoicePolicy;
-use App\Modules\Billing\Policies\PlanPolicy;
-use App\Modules\Billing\Policies\SubscriptionPolicy;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Policies\TenantPolicy;
 use App\Modules\User\Models\User;
 use App\Modules\User\Policies\UserPolicy;
-use App\Modules\Webhook\Models\Webhook;
-use App\Modules\Webhook\Policies\WebhookPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -61,10 +51,5 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
-        Gate::policy(ApiToken::class, ApiTokenPolicy::class);
-        Gate::policy(Webhook::class, WebhookPolicy::class);
-        Gate::policy(Plan::class, PlanPolicy::class);
-        Gate::policy(Subscription::class, SubscriptionPolicy::class);
-        Gate::policy(Invoice::class, InvoicePolicy::class);
     }
 }

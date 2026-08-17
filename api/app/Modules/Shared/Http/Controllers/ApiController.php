@@ -12,17 +12,8 @@ abstract class ApiController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * Para requests autenticados via API token, o middleware EnsurePermission
-     * já validou os escopos — a verificação do Gate é redundante e quebraria
-     * porque não há usuário autenticado (token é machine-to-machine).
-     */
     public function authorize($ability, $arguments = []): void
     {
-        if (request()->attributes->get('api_token')) {
-            return;
-        }
-
         Gate::forUser(request()->user())->authorize($ability, $arguments);
     }
 

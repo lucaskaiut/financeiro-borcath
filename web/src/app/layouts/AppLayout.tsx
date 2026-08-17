@@ -1,12 +1,11 @@
 import { Suspense } from 'react'
 import { Outlet } from 'react-router'
-import { CreditCard, LayoutDashboard, KeyRound, LogOut, Menu, Receipt, ShieldCheck, Users, Webhook, Zap } from 'lucide-react'
+import { LayoutDashboard, LogOut, Menu, ShieldCheck, Users, Zap } from 'lucide-react'
 import { TenantSelector } from '@/modules/auth/components/TenantSelector'
 import { useSessionStore } from '@/shared/stores/session.store'
 import { useTenantContextStore } from '@/shared/stores/tenant.store'
 import { useUiStore } from '@/shared/stores/ui.store'
 import { Permission } from '@/shared/constants/permissions'
-import { useIsUmbrellaTenant } from '@/shared/hooks/useIsUmbrellaTenant'
 import { usePermissions } from '@/shared/hooks/usePermissions'
 import { useLogout } from '@/modules/auth/hooks/useAuth'
 import {
@@ -49,14 +48,6 @@ function Brand() {
 
 function SidebarNavigation({ onNavigate }: { onNavigate?: () => void }) {
   const { can } = usePermissions()
-  const isUmbrella = useIsUmbrellaTenant()
-  /** Funcionalidades de uso final só no tenant filho (empresa operacional). */
-  const isOperatingTenant = !isUmbrella
-
-  const showPlans = isUmbrella && can(Permission.PLAN_READ)
-  const showSubscription = isOperatingTenant && can(Permission.SUBSCRIPTION_READ)
-  const showInvoices = isOperatingTenant && can(Permission.INVOICE_READ)
-  const showBillingGroup = showPlans || showSubscription || showInvoices
 
   return (
     <Sidebar header={<Brand />}>
@@ -64,42 +55,12 @@ function SidebarNavigation({ onNavigate }: { onNavigate?: () => void }) {
         <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onNavigate={onNavigate} />
       </SidebarGroup>
 
-      {showBillingGroup && (
-        <SidebarGroup label="Assinaturas">
-          {showPlans && (
-            <SidebarItem to="/billing/plans" icon={CreditCard} label="Planos" onNavigate={onNavigate} />
-          )}
-          {showSubscription && (
-            <SidebarItem
-              to="/billing/subscription"
-              icon={CreditCard}
-              label="Minha assinatura"
-              onNavigate={onNavigate}
-            />
-          )}
-          {showInvoices && (
-            <SidebarItem
-              to="/billing/invoices"
-              icon={Receipt}
-              label="Cobranças"
-              onNavigate={onNavigate}
-            />
-          )}
-        </SidebarGroup>
-      )}
-
       <SidebarGroup label="Gestão">
         {can(Permission.USER_READ) && (
           <SidebarItem to="/users" icon={Users} label="Usuários" onNavigate={onNavigate} />
         )}
         {can(Permission.ROLE_READ) && (
           <SidebarItem to="/roles" icon={ShieldCheck} label="Perfis de acesso" onNavigate={onNavigate} />
-        )}
-        {can(Permission.API_TOKEN_READ) && (
-          <SidebarItem to="/api-tokens" icon={KeyRound} label="Tokens de API" onNavigate={onNavigate} />
-        )}
-        {can(Permission.WEBHOOK_READ) && (
-          <SidebarItem to="/webhooks" icon={Webhook} label="Webhooks" onNavigate={onNavigate} />
         )}
       </SidebarGroup>
 

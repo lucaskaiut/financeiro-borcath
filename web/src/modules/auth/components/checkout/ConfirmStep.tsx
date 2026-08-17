@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Checkbox } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { onlyDigits } from '@/shared/utils/document'
-import { formatCurrency } from '@/shared/utils/format'
 import { formatDocument } from '@/shared/utils/document'
 import { toast } from '@/shared/stores/toast.store'
 import { useSessionStore } from '@/shared/stores/session.store'
 import { queryKeys } from '@/shared/constants/query-keys'
-import { useQueryClient } from '@tanstack/react-query'
-import { checkoutService } from '../../services/checkout.service'
+import { http } from '@/shared/api/http'
+import { ensureCsrfCookie } from '@/shared/api/csrf'
 import { useRegisterCheckoutStore } from '../../store/register-checkout.store'
 import { authService } from '../../services/auth.service'
 
@@ -23,25 +23,22 @@ export function ConfirmStep() {
 
   const company = useRegisterCheckoutStore((state) => state.company)
   const user = useRegisterCheckoutStore((state) => state.user)
-  const selectedPlan = useRegisterCheckoutStore((state) => state.selectedPlan)
   const acceptedTerms = useRegisterCheckoutStore((state) => state.acceptedTerms)
   const setAcceptedTerms = useRegisterCheckoutStore((state) => state.setAcceptedTerms)
   const previousStep = useRegisterCheckoutStore((state) => state.previousStep)
   const reset = useRegisterCheckoutStore((state) => state.reset)
 
-  const canConfirm = Boolean(selectedPlan) && acceptedTerms
-  const needsPaymentAfterSignup =
-    selectedPlan?.requires_immediate_payment ??
-    (selectedPlan ? !(selectedPlan.free_trial_days > 0) : false)
+  const canConfirm = acceptedTerms
 
   const onConfirm = async () => {
-    if (!selectedPlan || !canConfirm) return
+    if (!canConfirm) return
 
     setSubmitting(true)
     setError(null)
 
     try {
-      const result = await checkoutService.register({
+      await ensureCsrfCookie()
+      await http.post('/auth/register', {
         company: {
           name: company.name,
           document: onlyDigits(company.document),
@@ -52,9 +49,6 @@ export function ConfirmStep() {
           email: user.email,
           password: user.password,
         },
-        subscription: {
-          plan_id: selectedPlan.id,
-        },
       })
 
       reset()
@@ -63,17 +57,7 @@ export function ConfirmStep() {
       setSession(session)
       await queryClient.invalidateQueries({ queryKey: queryKeys.session })
 
-      if (result.requires_payment && result.invoice) {
-        navigate(`/pagamento?invoice=${result.invoice.id}`, { replace: true })
-        return
-      }
-
-      toast.success(
-        'Conta criada com sucesso',
-        result.is_trial
-          ? `Seu período de teste de ${result.trial_days} dias já está ativo.`
-          : 'Bem-vindo à Nox.',
-      )
+      toast.success('Conta criada com sucesso', 'Bem-vindo à Nox.')
 
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -106,30 +90,6 @@ export function ConfirmStep() {
         <Line label="Nome" value={user.name} />
         <Line label="E-mail" value={user.email} />
       </SummaryBlock>
-
-      <SummaryBlock title="Plano">
-        <Line label="Nome" value={selectedPlan?.name ?? '—'} />
-        <Line label="Valor" value={formatCurrency(selectedPlan?.price)} />
-        <Line
-          label="Trial"
-          value={
-            selectedPlan?.is_trial || (selectedPlan?.free_trial_days ?? 0) > 0
-              ? `${selectedPlan?.trial_days ?? selectedPlan?.free_trial_days} dias`
-              : 'Sem trial'
-          }
-        />
-      </SummaryBlock>
-
-      {needsPaymentAfterSignup ? (
-        <Alert variant="info" title="Pagamento na próxima etapa">
-          Após confirmar, você escolhe o método de pagamento e conclui a cobrança na plataforma.
-        </Alert>
-      ) : (
-        <Alert variant="info" title="Nenhuma cobrança agora">
-          Seu plano inclui período de teste. A cobrança começa após o trial, com o método que
-          você escolher na plataforma.
-        </Alert>
-      )}
 
       <Checkbox
         id="terms"

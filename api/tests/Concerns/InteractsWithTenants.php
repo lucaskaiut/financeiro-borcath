@@ -5,8 +5,6 @@ namespace Tests\Concerns;
 use App\Modules\ACL\Enums\DefaultRole;
 use App\Modules\ACL\Models\Role;
 use App\Modules\ACL\Services\RoleService;
-use App\Modules\Billing\Models\Plan;
-use App\Modules\Billing\Models\Subscription;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Support\CurrentTenant;
 use App\Modules\User\Models\User;
@@ -79,9 +77,6 @@ trait InteractsWithTenants
         $umbrella ??= $this->createTenantWithRoles();
 
         $child = $this->createChildTenant($umbrella, $childAttributes);
-
-        $plan = Plan::factory()->forTenant($umbrella)->create();
-        Subscription::factory()->forTenant($child)->forPlan($plan)->active()->create();
 
         return [$umbrella, $child];
     }

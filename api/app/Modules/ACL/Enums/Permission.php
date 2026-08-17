@@ -17,25 +17,6 @@ enum Permission: string
     case ROLE_UPDATE = 'role.update';
     case ROLE_DELETE = 'role.delete';
 
-    case API_TOKEN_CREATE = 'api-token.create';
-    case API_TOKEN_READ = 'api-token.read';
-    case API_TOKEN_DELETE = 'api-token.delete';
-
-    case WEBHOOK_CREATE = 'webhook.create';
-    case WEBHOOK_READ = 'webhook.read';
-    case WEBHOOK_UPDATE = 'webhook.update';
-    case WEBHOOK_DELETE = 'webhook.delete';
-
-    case PLAN_CREATE = 'plan.create';
-    case PLAN_READ = 'plan.read';
-    case PLAN_UPDATE = 'plan.update';
-    case PLAN_DELETE = 'plan.delete';
-
-    case SUBSCRIPTION_READ = 'subscription.read';
-    case SUBSCRIPTION_UPDATE = 'subscription.update';
-
-    case INVOICE_READ = 'invoice.read';
-
     /**
      * @return list<string>
      */
