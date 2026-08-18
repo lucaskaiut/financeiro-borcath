@@ -17,6 +17,9 @@ class AuditLog extends Model
         'action',
         'ip',
         'user_agent',
+        'entity_type',
+        'entity_id',
+        'details',
         'created_at',
     ];
 
@@ -24,6 +27,7 @@ class AuditLog extends Model
     {
         return [
             'created_at' => 'datetime',
+            'details' => 'array',
         ];
     }
 

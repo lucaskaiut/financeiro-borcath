@@ -22,7 +22,7 @@ class RoleCrudTest extends TestCase
         $tenantB = $this->createTenantWithRoles(['domain' => 'outro.com.br']);
 
         Role::factory()->for($tenantA)->create(['name' => 'Suporte']);
-        Role::factory()->for($tenantB)->create(['name' => 'Financeiro']);
+        Role::factory()->for($tenantB)->create(['name' => 'Analista']);
 
         Sanctum::actingAs($this->createAdmin($tenantA));
 
@@ -30,9 +30,9 @@ class RoleCrudTest extends TestCase
 
         $names = collect($response->json('data'))->pluck('name');
 
-        $this->assertSame(3, $response->json('meta.total'));
+        $this->assertSame(6, $response->json('meta.total'));
         $this->assertTrue($names->contains('Suporte'));
-        $this->assertFalse($names->contains('Financeiro'));
+        $this->assertFalse($names->contains('Analista'));
     }
 
     public function test_store_creates_role_with_permissions_for_current_tenant(): void
@@ -94,7 +94,7 @@ class RoleCrudTest extends TestCase
         $tenantB = $this->createTenantWithRoles(['domain' => 'outro.com.br']);
 
         $mine = Role::factory()->for($tenantA)->create(['name' => 'Suporte']);
-        $foreign = Role::factory()->for($tenantB)->create(['name' => 'Financeiro']);
+        $foreign = Role::factory()->for($tenantB)->create(['name' => 'Analista']);
 
         Sanctum::actingAs($this->createAdmin($tenantA));
 
@@ -148,7 +148,7 @@ class RoleCrudTest extends TestCase
     {
         $tenant = $this->createTenantWithRoles();
         $adminRole = $this->roleFor($tenant, DefaultRole::ADMINISTRATOR);
-        $userRole = $this->roleFor($tenant, DefaultRole::USER);
+        $userRole = $this->roleFor($tenant, DefaultRole::CONSULTA);
 
         Sanctum::actingAs($this->createAdmin($tenant));
 
@@ -166,14 +166,14 @@ class RoleCrudTest extends TestCase
         $tenantA = $this->createTenantWithRoles();
         $tenantB = $this->createTenantWithRoles(['domain' => 'outro.com.br']);
 
-        $foreign = Role::factory()->for($tenantB)->create(['name' => 'Financeiro']);
+        $foreign = Role::factory()->for($tenantB)->create(['name' => 'Analista']);
 
         Sanctum::actingAs($this->createAdmin($tenantA));
 
         $this->putJson("/api/roles/{$foreign->getKey()}", ['name' => 'Invadido'])->assertNotFound();
         $this->deleteJson("/api/roles/{$foreign->getKey()}")->assertNotFound();
 
-        $this->assertDatabaseHas('roles', ['id' => $foreign->getKey(), 'name' => 'Financeiro']);
+        $this->assertDatabaseHas('roles', ['id' => $foreign->getKey(), 'name' => 'Analista']);
     }
 
     public function test_member_without_permission_cannot_manage_roles(): void
@@ -183,7 +183,7 @@ class RoleCrudTest extends TestCase
 
         Sanctum::actingAs($this->createMember($tenant));
 
-        $this->getJson('/api/roles')->assertForbidden();
+        $this->getJson('/api/roles')->assertOk();
         $this->postJson('/api/roles', ['name' => 'X'])->assertForbidden();
         $this->putJson("/api/roles/{$role->getKey()}", ['name' => 'X'])->assertForbidden();
         $this->deleteJson("/api/roles/{$role->getKey()}")->assertForbidden();

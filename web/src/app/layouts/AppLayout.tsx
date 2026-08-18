@@ -1,6 +1,22 @@
 import { Suspense } from 'react'
 import { Outlet } from 'react-router'
-import { LayoutDashboard, LogOut, Menu, ShieldCheck, Users, Zap } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  BarChart3,
+  BookOpenCheck,
+  LayoutDashboard,
+  Landmark,
+  LogOut,
+  Menu,
+  Repeat,
+  ScrollText,
+  ShieldCheck,
+  Tags,
+  TrendingUp,
+  Users,
+  Wallet,
+  Zap,
+} from 'lucide-react'
 import { TenantSelector } from '@/modules/auth/components/TenantSelector'
 import { useSessionStore } from '@/shared/stores/session.store'
 import { useTenantContextStore } from '@/shared/stores/tenant.store'
@@ -55,12 +71,48 @@ function SidebarNavigation({ onNavigate }: { onNavigate?: () => void }) {
         <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onNavigate={onNavigate} />
       </SidebarGroup>
 
+      <SidebarGroup label="Financeiro">
+        {can(Permission.CASH_FLOW_VIEW) && (
+          <SidebarItem to="/cash-flow/realized" icon={TrendingUp} label="Fluxo realizado" onNavigate={onNavigate} />
+        )}
+        {can(Permission.CASH_FLOW_VIEW) && (
+          <SidebarItem to="/cash-flow/projected" icon={BarChart3} label="Fluxo projetado" onNavigate={onNavigate} />
+        )}
+        {can(Permission.ACCOUNTS_VIEW) && (
+          <SidebarItem to="/accounts" icon={Wallet} label="Contas a pagar/receber" onNavigate={onNavigate} />
+        )}
+        {can(Permission.RECURRENCES_VIEW) && (
+          <SidebarItem to="/recurrences" icon={Repeat} label="Recorrências" onNavigate={onNavigate} />
+        )}
+        {can(Permission.TRANSFERS_VIEW) && (
+          <SidebarItem to="/transfers" icon={ArrowRightLeft} label="Transferências" onNavigate={onNavigate} />
+        )}
+        {can(Permission.RECONCILIATION_VIEW) && (
+          <SidebarItem to="/reconciliation" icon={BookOpenCheck} label="Conciliação" onNavigate={onNavigate} />
+        )}
+        {can(Permission.REPORTS_VIEW) && (
+          <SidebarItem to="/reports" icon={BarChart3} label="Relatórios" onNavigate={onNavigate} />
+        )}
+      </SidebarGroup>
+
+      <SidebarGroup label="Cadastros">
+        {can(Permission.COST_CENTERS_VIEW) && (
+          <SidebarItem to="/cost-centers" icon={Landmark} label="Centros de custo" onNavigate={onNavigate} />
+        )}
+        {can(Permission.CATEGORIES_VIEW) && (
+          <SidebarItem to="/categories" icon={Tags} label="Categorias" onNavigate={onNavigate} />
+        )}
+      </SidebarGroup>
+
       <SidebarGroup label="Gestão">
         {can(Permission.USER_READ) && (
           <SidebarItem to="/users" icon={Users} label="Usuários" onNavigate={onNavigate} />
         )}
         {can(Permission.ROLE_READ) && (
           <SidebarItem to="/roles" icon={ShieldCheck} label="Perfis de acesso" onNavigate={onNavigate} />
+        )}
+        {can(Permission.AUDIT_VIEW) && (
+          <SidebarItem to="/audit" icon={ScrollText} label="Auditoria" onNavigate={onNavigate} />
         )}
       </SidebarGroup>
 

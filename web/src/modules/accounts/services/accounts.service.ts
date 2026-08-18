@@ -1,0 +1,71 @@
+import { http } from '@/shared/api/http'
+import type { ApiResponse, PaginatedResponse } from '@/shared/types/api'
+import type { Account } from '@/shared/types/models'
+import type { AccountListParams } from '@/shared/constants/query-keys'
+
+export interface AccountPayload {
+  type: 'payable' | 'receivable'
+  description: string
+  counterparty?: string | null
+  cost_center_id: string
+  category_id: string
+  value: number
+  due_date: string
+  expected_date?: string | null
+  observation?: string | null
+  installments?: { quantity: number; interval?: 'daily' | 'weekly' | 'monthly' } | null
+}
+
+export interface SettlePayload {
+  value?: number | null
+  settled_at?: string | null
+  method?: string | null
+}
+
+export const accountsService = {
+  async list(params: AccountListParams): Promise<PaginatedResponse<Account>> {
+    const response = await http.get<PaginatedResponse<Account>>('/accounts', { params })
+
+    return response.data
+  },
+
+  async get(id: string): Promise<Account> {
+    const response = await http.get<ApiResponse<Account>>(`/accounts/${id}`)
+
+    return response.data.data
+  },
+
+  async create(payload: AccountPayload): Promise<ApiResponse<Account[]>> {
+    const response = await http.post<ApiResponse<Account[]>>('/accounts', payload)
+
+    return response.data
+  },
+
+  async update(id: string, payload: Partial<AccountPayload>): Promise<Account> {
+    const response = await http.put<ApiResponse<Account>>(`/accounts/${id}`, payload)
+
+    return response.data.data
+  },
+
+  async remove(id: string): Promise<void> {
+    await http.delete(`/accounts/${id}`)
+  },
+
+  async settle(id: string, payload: SettlePayload): Promise<Account> {
+    const response = await http.post<ApiResponse<Account>>(`/accounts/${id}/settle`, payload)
+
+    return response.data.data
+  },
+
+  async unsettle(id: string, settlementId: string): Promise<Account> {
+    const response = await http.delete<ApiResponse<Account>>(`/accounts/${id}/settlements/${settlementId}`)
+
+    return response.data.data
+  },
+
+  async cancel(id: string): Promise<Account> {
+    const response = await http.post<ApiResponse<Account>>(`/accounts/${id}/cancel`)
+
+    return response.data.data
+  },
+}

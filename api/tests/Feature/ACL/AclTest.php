@@ -20,14 +20,17 @@ class AclTest extends TestCase
         $tenant = $this->createTenantWithRoles();
 
         $admin = $this->roleFor($tenant, DefaultRole::ADMINISTRATOR);
-        $member = $this->roleFor($tenant, DefaultRole::USER);
+        $member = $this->roleFor($tenant, DefaultRole::CONSULTA);
 
         $this->assertEqualsCanonicalizing(
             Permission::values(),
             $admin->permissionValues()->all(),
         );
 
-        $this->assertSame([Permission::USER_READ->value], $member->permissionValues()->all());
+        $this->assertEqualsCanonicalizing(
+            array_map(fn (Permission $permission) => $permission->value, Permission::viewOnly()),
+            $member->permissionValues()->all(),
+        );
     }
 
     public function test_user_role_and_permission_helpers(): void
@@ -37,7 +40,7 @@ class AclTest extends TestCase
         $member = $this->createMember($tenant);
 
         $this->assertTrue($admin->hasRole(DefaultRole::ADMINISTRATOR->value));
-        $this->assertFalse($admin->hasRole(DefaultRole::USER->value));
+        $this->assertFalse($admin->hasRole(DefaultRole::CONSULTA->value));
 
         $this->assertTrue($admin->hasPermission(Permission::USER_DELETE));
         $this->assertTrue($admin->hasPermission('tenant.update'));
