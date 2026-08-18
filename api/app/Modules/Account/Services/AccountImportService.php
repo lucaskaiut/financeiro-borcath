@@ -13,6 +13,7 @@ use App\Modules\Category\Models\Category;
 use App\Modules\User\Models\User;
 use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
+use Normalizer;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
@@ -193,11 +194,22 @@ class AccountImportService
 
     private function normalize(mixed $value): string
     {
-        $s = mb_strtolower(trim((string) $value));
+        return $this->removeAccents(mb_strtolower(trim((string) $value)));
+    }
 
-        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+    /**
+     * Remove acentos usando a extensão intl (funciona em Alpine/musl,
+     * onde o iconv //TRANSLIT não translitera corretamente).
+     */
+    private function removeAccents(string $value): string
+    {
+        $decomposed = Normalizer::normalize($value, Normalizer::FORM_D);
 
-        return trim($ascii !== false ? $ascii : $s);
+        if ($decomposed === false) {
+            return $value;
+        }
+
+        return preg_replace('/[\x{0300}-\x{036F}]/u', '', $decomposed) ?? $value;
     }
 
     /**
