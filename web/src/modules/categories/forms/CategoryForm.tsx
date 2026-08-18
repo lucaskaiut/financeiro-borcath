@@ -1,4 +1,5 @@
-import { useForm } from 'react-hook-form'
+import { useEffect } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
@@ -13,6 +14,7 @@ import {
 } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
+import { useCategoryOptions } from '../hooks/useCategories'
 import { categorySchema, type CategoryFormValues } from '../schemas/category.schema'
 import type { CategoryPayload } from '../services/categories.service'
 
@@ -46,9 +48,20 @@ export function CategoryForm({ mode, defaultValues, submitting, onSubmit }: Cate
       type: 'expense',
       color: '#6366f1',
       status: 'active',
+      parent_id: '',
       ...defaultValues,
     },
   })
+
+  const parentId = useWatch({ control: form.control, name: 'parent_id' })
+  const categories = useCategoryOptions()
+  const parentOptions = (categories.data ?? []).filter((c) => c.parent_id === null)
+
+  useEffect(() => {
+    if (!parentId) return
+    const parent = parentOptions.find((option) => option.value === parentId)
+    if (parent) form.setValue('type', parent.type)
+  }, [parentId, parentOptions, form])
 
   const handleSubmit = async (values: CategoryFormValues) => {
     try {
@@ -57,6 +70,7 @@ export function CategoryForm({ mode, defaultValues, submitting, onSubmit }: Cate
         type: values.type,
         color: values.color || null,
         status: values.status,
+        parent_id: values.parent_id || null,
       })
     } catch (error) {
       if (isApiError(error) && error.status === 422) {
@@ -72,12 +86,19 @@ export function CategoryForm({ mode, defaultValues, submitting, onSubmit }: Cate
           <Section title="Dados da categoria">
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField name="name" label="Nome" placeholder="Ex.: Fornecedores" required className="sm:col-span-2" />
+              <SelectField
+                name="parent_id"
+                label="Categoria pai"
+                options={parentOptions.map((option) => ({ value: option.value, label: option.label }))}
+                placeholder="Nenhuma (categoria principal)"
+                hint="Selecione uma categoria pai para criar uma subcategoria."
+              />
               <SelectField name="color" label="Cor" options={COLOR_OPTIONS} />
               <SelectField name="status" label="Status" options={STATUS_OPTIONS} required />
             </div>
           </Section>
 
-          <Section title="Tipo">
+          <Section title="Tipo" description={parentId ? 'O tipo é herdado da categoria pai.' : undefined}>
             <RadioGroupField
               name="type"
               options={[

@@ -5,6 +5,7 @@ export const categorySchema = z.object({
   type: z.enum(['income', 'expense']),
   color: z.string(),
   status: z.string().min(1),
+  parent_id: z.string(),
 })
 
 export type CategoryFormValues = z.infer<typeof categorySchema>

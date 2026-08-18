@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Banknote, CheckCircle2, Pencil, Plus, Trash2, Undo2, XCircle } from 'lucide-react'
+import { Banknote, CheckCircle2, FileUp, Pencil, Plus, Trash2, Undo2, XCircle } from 'lucide-react'
 import {
   Badge,
   Button,
   ButtonLink,
   ConfirmDialog,
   DataTable,
+  DateRangeShortcuts,
   EmptyState,
   Page,
   PageContent,
@@ -32,6 +33,7 @@ import {
   useUnsettleAccount,
 } from '../hooks/useAccounts'
 import { SettleDialog } from '../components/SettleDialog'
+import { ImportAccountsDialog } from '../components/ImportAccountsDialog'
 
 const PER_PAGE = 10
 
@@ -64,6 +66,8 @@ export default function AccountsListPage() {
   const type = searchParams.get('type') ?? ''
   const status = searchParams.get('status') ?? ''
   const costCenterId = searchParams.get('cost_center_id') ?? ''
+  const dueFrom = searchParams.get('due_from') ?? ''
+  const dueTo = searchParams.get('due_to') ?? ''
 
   const navigate = useNavigate()
   const { can } = usePermissions()
@@ -72,6 +76,7 @@ export default function AccountsListPage() {
   const [toDelete, setToDelete] = useState<Account | null>(null)
   const [toCancel, setToCancel] = useState<Account | null>(null)
   const [toSettle, setToSettle] = useState<Account | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   const deleteAccount = useDeleteAccount()
   const cancelAccount = useCancelAccount()
@@ -84,9 +89,11 @@ export default function AccountsListPage() {
     type: type || undefined,
     status: status || undefined,
     cost_center_id: costCenterId || undefined,
+    due_from: dueFrom || undefined,
+    due_to: dueTo || undefined,
   })
 
-  const updateParams = (next: { page?: number; search?: string; type?: string; status?: string; cost_center_id?: string }) => {
+  const updateParams = (next: { page?: number; search?: string; type?: string; status?: string; cost_center_id?: string; due_from?: string; due_to?: string }) => {
     setSearchParams((params) => {
       if (next.type !== undefined) {
         next.type ? params.set('type', next.type) : params.delete('type')
@@ -98,6 +105,14 @@ export default function AccountsListPage() {
       }
       if (next.cost_center_id !== undefined) {
         next.cost_center_id ? params.set('cost_center_id', next.cost_center_id) : params.delete('cost_center_id')
+        params.delete('page')
+      }
+      if (next.due_from !== undefined) {
+        next.due_from ? params.set('due_from', next.due_from) : params.delete('due_from')
+        params.delete('page')
+      }
+      if (next.due_to !== undefined) {
+        next.due_to ? params.set('due_to', next.due_to) : params.delete('due_to')
         params.delete('page')
       }
       if (next.search !== undefined) {
@@ -198,10 +213,16 @@ export default function AccountsListPage() {
         breadcrumb={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Contas' }]}
         actions={
           <Can permission={Permission.ACCOUNTS_CREATE}>
-            <ButtonLink to="/accounts/create">
-              <Plus className="size-4" />
-              Novo lançamento
-            </ButtonLink>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                <FileUp className="size-4" />
+                Importar planilha
+              </Button>
+              <ButtonLink to="/accounts/create">
+                <Plus className="size-4" />
+                Novo lançamento
+              </ButtonLink>
+            </div>
           </Can>
         }
       />
@@ -275,6 +296,44 @@ export default function AccountsListPage() {
               </button>
             ))}
           </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[13px] text-muted">Vencimento:</span>
+              <div className="flex items-center gap-2">
+                <label htmlFor="due_from" className="text-[13px] text-muted">De</label>
+                <input
+                  id="due_from"
+                  type="date"
+                  value={dueFrom}
+                  onChange={(e) => updateParams({ due_from: e.target.value })}
+                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="due_to" className="text-[13px] text-muted">Até</label>
+                <input
+                  id="due_to"
+                  type="date"
+                  value={dueTo}
+                  onChange={(e) => updateParams({ due_to: e.target.value })}
+                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
+                />
+              </div>
+              {(dueFrom !== '' || dueTo !== '') && (
+                <button
+                  type="button"
+                  onClick={() => updateParams({ due_from: '', due_to: '' })}
+                  className="text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <DateRangeShortcuts
+              onApply={({ from, to }) => updateParams({ due_from: from, due_to: to })}
+            />
+          </div>
         </div>
 
         <DataTable
@@ -313,6 +372,8 @@ export default function AccountsListPage() {
           setToSettle(null)
         }}
       />
+
+      <ImportAccountsDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
       <ConfirmDialog
         open={toCancel !== null}

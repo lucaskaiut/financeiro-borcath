@@ -19,7 +19,7 @@ class AccountService
     public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
         $query = FinancialAccount::query()
-            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,color,type'])
+            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,color,type', 'subcategory:id,uuid,name'])
             ->withSum('settlements', 'value');
 
         $query->when(filled($filters['type'] ?? null), fn ($q) => $q->where('type', $filters['type']));
@@ -48,7 +48,7 @@ class AccountService
     public function find(string $uuid): FinancialAccount
     {
         return FinancialAccount::query()
-            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,color,type', 'settlements' => fn ($q) => $q->orderBy('settled_at')])
+            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,color,type', 'subcategory:id,uuid,name', 'settlements' => fn ($q) => $q->orderBy('settled_at')])
             ->withSum('settlements', 'value')
             ->where('uuid', $uuid)
             ->firstOrFail();

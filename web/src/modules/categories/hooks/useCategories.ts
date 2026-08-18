@@ -16,7 +16,7 @@ export function useCategoryOptions(type?: 'income' | 'expense') {
   return useQuery({
     queryKey: queryKeys.categories.list({ per_page: 100, type }),
     queryFn: () => categoriesService.list({ per_page: 100, type }),
-    select: (data) => data.data.map((c) => ({ value: c.id, label: c.name })),
+    select: (data) => data.data.map((c) => ({ value: c.id, label: c.name, parent_id: c.parent_id, type: c.type })),
   })
 }
 

@@ -29,18 +29,6 @@ export function useLogin() {
   })
 }
 
-export function useRegister() {
-  const authenticate = useAuthenticate()
-
-  return useMutation({
-    mutationFn: authService.register,
-    onSuccess: async () => {
-      await authenticate()
-      toast.success('Conta criada com sucesso', 'Seu ambiente está pronto para uso.')
-    },
-  })
-}
-
 export function useLogout() {
   const queryClient = useQueryClient()
   const setGuest = useSessionStore((state) => state.setGuest)

@@ -13,6 +13,7 @@ import {
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
+import { toLocalIsoDate } from '@/shared/utils/format'
 import { transferSchema, type TransferFormValues } from '../schemas/transfer.schema'
 import type { TransferPayload } from '../services/transfers.service'
 
@@ -25,7 +26,7 @@ export function TransferForm({ submitting, onSubmit }: { submitting: boolean; on
       from_cost_center_id: '',
       to_cost_center_id: '',
       value: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: toLocalIsoDate(),
       description: '',
     },
   })

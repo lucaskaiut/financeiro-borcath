@@ -54,7 +54,8 @@ export const queryKeys = {
     all: ['reconciliation'] as const,
     list: (params: ListParams & { status?: string; cost_center_id?: string }) =>
       ['reconciliation', 'transactions', params] as const,
-    candidates: (id: string) => ['reconciliation', 'candidates', id] as const,
+    candidates: (id: string, from?: string, to?: string) =>
+      ['reconciliation', 'candidates', id, { from, to }] as const,
   },
 
   reports: {
@@ -68,6 +69,15 @@ export const queryKeys = {
 
   audit: {
     list: (params: ListParams & { action?: string }) => ['audit', 'list', params] as const,
+  },
+
+  assistant: {
+    all: ['assistant'] as const,
+    conversations: (params: ListParams & { search?: string }) =>
+      ['assistant', 'conversations', params] as const,
+    conversation: (id: string) => ['assistant', 'conversation', id] as const,
+    suggestions: ['assistant', 'suggestions'] as const,
+    settings: ['assistant', 'settings'] as const,
   },
 } as const
 

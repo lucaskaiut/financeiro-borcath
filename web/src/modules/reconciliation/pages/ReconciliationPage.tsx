@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   DataTable,
+  DateRangeShortcuts,
   EmptyState,
   Page,
   PageContent,
@@ -52,6 +53,8 @@ export default function ReconciliationPage() {
   const undo = useUndoReconciliation()
 
   const [costCenterId, setCostCenterId] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [fileName, setFileName] = useState('')
   const [matching, setMatching] = useState<BankTransaction | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -167,14 +170,41 @@ export default function ReconciliationPage() {
                 {fileName || 'Selecionar arquivo'}
               </label>
             </div>
+            <div>
+              <label className="mb-1.5 block text-[13px] font-medium text-foreground">Período (vencimento)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  aria-label="De"
+                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
+                />
+                <span className="text-sm text-muted">até</span>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  aria-label="Até"
+                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
+                />
+              </div>
+            </div>
             <Can permission={Permission.RECONCILIATION_EXECUTE}>
-              <Button onClick={() => autoReconcile.mutate()} loading={autoReconcile.isPending} variant="secondary">
+              <Button onClick={() => autoReconcile.mutate({ from: from || undefined, to: to || undefined })} loading={autoReconcile.isPending} variant="secondary">
                 <Wand2 className="size-4" />
                 Conciliação automática
               </Button>
             </Can>
           </CardContent>
         </Card>
+
+        <DateRangeShortcuts
+          onApply={({ from: nextFrom, to: nextTo }) => {
+            setFrom(nextFrom)
+            setTo(nextTo)
+          }}
+        />
 
         <div className="flex gap-2">
           <Select
@@ -215,7 +245,7 @@ export default function ReconciliationPage() {
         {query.data && <Pagination meta={query.data.meta} onPageChange={(next) => setSearchParams((p) => { next > 1 ? p.set('page', String(next)) : p.delete('page'); return p })} />}
       </PageContent>
 
-      <MatchDialog transaction={matching} open={matching !== null} onClose={() => setMatching(null)} />
+      <MatchDialog transaction={matching} from={from} to={to} open={matching !== null} onClose={() => setMatching(null)} />
     </Page>
   )
 }

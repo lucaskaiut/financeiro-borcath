@@ -15,14 +15,14 @@ import {
   Skeleton,
   type Column,
 } from '@/shared/design-system'
-import { formatCurrency, formatDate } from '@/shared/utils/format'
+import { formatCurrency, formatDate, toLocalIsoDate } from '@/shared/utils/format'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import { useCategoryOptions } from '@/modules/categories/hooks/useCategories'
 import { useRealizedCashFlow } from '../hooks/useCashFlow'
 import type { RealizedEntry } from '../services/cash-flow.service'
 
-const today = new Date().toISOString().slice(0, 10)
-const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
+const today = toLocalIsoDate()
+const firstOfMonth = toLocalIsoDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
 export default function CashFlowRealizedPage() {
   const [from, setFrom] = useState(firstOfMonth)

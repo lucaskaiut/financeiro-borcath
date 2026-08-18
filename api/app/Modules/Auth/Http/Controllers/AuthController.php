@@ -4,11 +4,7 @@ namespace App\Modules\Auth\Http\Controllers;
 
 use App\Modules\ACL\Http\Resources\RoleResource;
 use App\Modules\Auth\DTOs\AuthenticatedUser;
-use App\Modules\Auth\DTOs\NewTenantData;
-use App\Modules\Auth\DTOs\NewUserData;
-use App\Modules\Auth\DTOs\RegisterResult;
 use App\Modules\Auth\Http\Requests\LoginRequest;
-use App\Modules\Auth\Http\Requests\RegisterRequest;
 use App\Modules\Auth\Http\Requests\SelectTenantRequest;
 use App\Modules\Auth\Services\AuthService;
 use App\Modules\Shared\Http\Controllers\ApiController;
@@ -27,24 +23,6 @@ class AuthController extends ApiController
         private readonly AuthService $service,
         private readonly TenantSwitchService $tenantSwitch,
     ) {}
-
-    public function register(RegisterRequest $request): JsonResponse
-    {
-        $result = $this->service->register(
-            NewTenantData::fromArray($request->validated('tenant')),
-            NewUserData::fromArray($request->validated('user')),
-        );
-
-        return $this->created(
-            $this->authPayload(new AuthenticatedUser(
-                user: $result->user,
-                tenant: $result->tenant,
-                token: $result->token,
-                availableTenants: $result->availableTenants,
-            )),
-            'Cadastro realizado com sucesso.',
-        );
-    }
 
     public function login(LoginRequest $request): JsonResponse
     {

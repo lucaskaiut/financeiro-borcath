@@ -5,10 +5,38 @@ const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
 })
 const relativeFormatter = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' })
 
+/**
+ * Converte uma data para o formato local ISO (YYYY-MM-DD).
+ * `Date#toISOString` usa UTC e, em fusos atrás do UTC (ex.: Brasil),
+ * produziria a data do dia anterior entre 00:00 e 03:00.
+ */
+export function toLocalIsoDate(date: Date = new Date()): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Interpreta strings de data:
+ * - "YYYY-MM-DD" (data pura) → data local, evitando o deslocamento de fuso.
+ * - ISO com horário/timezone → `new Date` normalmente.
+ */
+function parseDateInput(value: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  }
+
+  return new Date(value)
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
 
-  return dateFormatter.format(new Date(value))
+  return dateFormatter.format(parseDateInput(value))
 }
 
 export function formatDateTime(value: string | null | undefined): string {

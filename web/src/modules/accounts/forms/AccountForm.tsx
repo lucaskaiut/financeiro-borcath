@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -36,6 +37,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
       counterparty: '',
       cost_center_id: '',
       category_id: '',
+      subcategory_id: '',
       value: '',
       due_date: '',
       expected_date: '',
@@ -48,10 +50,32 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
   })
 
   const type = useWatch({ control: form.control, name: 'type' })
+  const categoryId = useWatch({ control: form.control, name: 'category_id' })
+  const subcategoryId = useWatch({ control: form.control, name: 'subcategory_id' })
   const installments = useWatch({ control: form.control, name: 'installments' })
 
   const costCenters = useCostCenterOptions()
   const categories = useCategoryOptions(type === 'receivable' ? 'income' : 'expense')
+  const topLevelCategories = (categories.data ?? []).filter((c) => c.parent_id === null)
+  const subcategories = (categories.data ?? []).filter((c) => c.parent_id !== null)
+
+  // Ao selecionar uma subcategoria, preenche a categoria automaticamente.
+  useEffect(() => {
+    if (!categories.isSuccess || !subcategoryId) return
+    const sub = subcategories.find((c) => c.value === subcategoryId)
+    if (sub && sub.parent_id && sub.parent_id !== categoryId) {
+      form.setValue('category_id', sub.parent_id)
+    }
+  }, [subcategoryId, categoryId, subcategories, categories.isSuccess, form])
+
+  // Ao trocar a categoria, limpa a subcategoria se ela não pertencer à nova categoria.
+  useEffect(() => {
+    if (!categories.isSuccess || !subcategoryId || !categoryId) return
+    const sub = subcategories.find((c) => c.value === subcategoryId)
+    if (!sub || sub.parent_id !== categoryId) {
+      form.setValue('subcategory_id', '')
+    }
+  }, [categoryId, subcategoryId, subcategories, categories.isSuccess, form])
 
   const handleSubmit = async (values: AccountFormValues) => {
     const payload: AccountPayload = {
@@ -60,6 +84,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
       counterparty: values.counterparty || null,
       cost_center_id: values.cost_center_id,
       category_id: values.category_id,
+      subcategory_id: values.subcategory_id || null,
       value: Number(values.value),
       due_date: values.due_date,
       expected_date: values.expected_date || null,
@@ -111,9 +136,15 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
               <SelectField
                 name="category_id"
                 label="Categoria"
-                options={categories.data ?? []}
+                options={topLevelCategories.map((c) => ({ value: c.value, label: c.label }))}
                 placeholder="Selecione"
                 required
+              />
+              <SelectField
+                name="subcategory_id"
+                label="Subcategoria"
+                options={subcategories.map((c) => ({ value: c.value, label: c.label }))}
+                placeholder="Sem subcategoria"
               />
               <TextField name="value" label="Valor" type="number" step="0.01" min="0" required />
               <TextField name="due_date" label="Data de vencimento" type="date" required />

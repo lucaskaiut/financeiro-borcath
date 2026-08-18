@@ -9,7 +9,6 @@ import { Permission } from '@/shared/constants/permissions'
 import { NotFoundPage } from './NotFoundPage'
 
 const LoginPage = lazy(() => import('@/modules/auth/pages/LoginPage'))
-const RegisterPage = lazy(() => import('@/modules/auth/pages/RegisterPage'))
 const DashboardPage = lazy(() => import('@/modules/dashboard/pages/DashboardPage'))
 const UsersListPage = lazy(() => import('@/modules/users/pages/UsersListPage'))
 const UserCreatePage = lazy(() => import('@/modules/users/pages/UserCreatePage'))
@@ -46,6 +45,9 @@ const ReportsPage = lazy(() => import('@/modules/reports/pages/ReportsPage'))
 
 const AuditPage = lazy(() => import('@/modules/audit/pages/AuditPage'))
 
+const AssistantPage = lazy(() => import('@/modules/assistant/pages/AssistantPage'))
+const AiSettingsPage = lazy(() => import('@/modules/assistant/pages/AiSettingsPage'))
+
 export const router = createBrowserRouter([
   {
     element: <GuestGuard />,
@@ -54,7 +56,6 @@ export const router = createBrowserRouter([
         element: <AuthLayout />,
         children: [
           { path: '/auth/login', element: <LoginPage /> },
-          { path: '/auth/register', element: <RegisterPage /> },
         ],
       },
     ],
@@ -267,7 +268,23 @@ export const router = createBrowserRouter([
               </PermissionGuard>
             ),
           },
+          {
+            path: '/settings/ai',
+            element: (
+              <PermissionGuard permission={Permission.ASSISTANT_CONFIGURE}>
+                <AiSettingsPage />
+              </PermissionGuard>
+            ),
+          },
         ],
+      },
+      {
+        path: '/assistant/:id?',
+        element: (
+          <PermissionGuard permission={Permission.ASSISTANT_VIEW}>
+            <AssistantPage />
+          </PermissionGuard>
+        ),
       },
     ],
   },

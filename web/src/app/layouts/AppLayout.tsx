@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   BarChart3,
   BookOpenCheck,
+  Bot,
   LayoutDashboard,
   Landmark,
   LogOut,
@@ -11,6 +12,7 @@ import {
   Repeat,
   ScrollText,
   ShieldCheck,
+  Sparkles,
   Tags,
   TrendingUp,
   Users,
@@ -18,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { TenantSelector } from '@/modules/auth/components/TenantSelector'
+import { AssistantWidget } from '@/modules/assistant/components/AssistantWidget'
 import { useSessionStore } from '@/shared/stores/session.store'
 import { useTenantContextStore } from '@/shared/stores/tenant.store'
 import { useUiStore } from '@/shared/stores/ui.store'
@@ -69,6 +72,9 @@ function SidebarNavigation({ onNavigate }: { onNavigate?: () => void }) {
     <Sidebar header={<Brand />}>
       <SidebarGroup label="Geral">
         <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onNavigate={onNavigate} />
+        {can(Permission.ASSISTANT_VIEW) && (
+          <SidebarItem to="/assistant" icon={Sparkles} label="Assistente de IA" onNavigate={onNavigate} />
+        )}
       </SidebarGroup>
 
       <SidebarGroup label="Financeiro">
@@ -113,6 +119,9 @@ function SidebarNavigation({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {can(Permission.AUDIT_VIEW) && (
           <SidebarItem to="/audit" icon={ScrollText} label="Auditoria" onNavigate={onNavigate} />
+        )}
+        {can(Permission.ASSISTANT_CONFIGURE) && (
+          <SidebarItem to="/settings/ai" icon={Bot} label="Inteligência Artificial" onNavigate={onNavigate} />
         )}
       </SidebarGroup>
 
@@ -205,6 +214,8 @@ export function AppLayout() {
           </Container>
         </main>
       </div>
+
+      <AssistantWidget />
     </div>
   )
 }

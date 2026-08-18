@@ -38,6 +38,19 @@ export function useCreateAccount() {
   })
 }
 
+export function useImportAccounts() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ file, costCenterId }: { file: File; costCenterId: string }) =>
+      accountsService.importXlsx(file, costCenterId),
+    onSuccess: (result) => {
+      invalidateAccounts(queryClient)
+      toast.success('Importação concluída', `${result.imported} contas importadas, ${result.skipped} ignoradas.`)
+    },
+  })
+}
+
 export function useUpdateAccount(id: string) {
   const queryClient = useQueryClient()
 

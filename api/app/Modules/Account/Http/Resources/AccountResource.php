@@ -30,6 +30,10 @@ class AccountResource extends JsonResource
                 'color' => $this->category?->color,
                 'type' => $this->category?->type?->value,
             ]),
+            'subcategory_id' => $this->subcategory?->uuid,
+            'subcategory' => $this->whenLoaded('subcategory', fn () => [
+                'name' => $this->subcategory?->name,
+            ]),
             'value' => (float) $this->value,
             'settled_amount' => $this->settled_amount,
             'remaining_amount' => $this->remaining_amount,

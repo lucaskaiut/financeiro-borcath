@@ -10,6 +10,7 @@ use App\Modules\Auth\DTOs\AuthenticatedUser;
 use App\Modules\Auth\DTOs\NewTenantData;
 use App\Modules\Auth\DTOs\NewUserData;
 use App\Modules\Auth\DTOs\RegisterResult;
+use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Services\MasterTenantAccessService;
 use App\Modules\Tenant\Services\TenantService;
 use App\Modules\Tenant\Support\CurrentTenant;
@@ -117,7 +118,7 @@ class AuthService
     }
 
     /**
-     * @return Collection<int, \App\Modules\Tenant\Models\Tenant>
+     * @return Collection<int, Tenant>
      */
     public function availableTenantsFor(User $user): Collection
     {

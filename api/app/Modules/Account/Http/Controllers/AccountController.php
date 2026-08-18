@@ -3,12 +3,14 @@
 namespace App\Modules\Account\Http\Controllers;
 
 use App\Modules\Account\Enums\AccountStatus;
+use App\Modules\Account\Http\Requests\ImportAccountsRequest;
 use App\Modules\Account\Http\Requests\SettleAccountRequest;
 use App\Modules\Account\Http\Requests\StoreAccountRequest;
 use App\Modules\Account\Http\Requests\UpdateAccountRequest;
 use App\Modules\Account\Http\Resources\AccountResource;
 use App\Modules\Account\Models\FinancialAccount;
 use App\Modules\Account\Models\Settlement;
+use App\Modules\Account\Services\AccountImportService;
 use App\Modules\Account\Services\AccountService;
 use App\Modules\Audit\Enums\AuditAction;
 use App\Modules\Audit\Services\AuditLogService;
@@ -21,6 +23,7 @@ class AccountController extends ApiController
 {
     public function __construct(
         private readonly AccountService $service,
+        private readonly AccountImportService $imports,
         private readonly AuditLogService $audit,
     ) {}
 
@@ -78,6 +81,19 @@ class AccountController extends ApiController
             AccountResource::collection($accounts),
             count($accounts) > 1 ? 'Parcelamento gerado com sucesso.' : 'Conta criada com sucesso.',
         );
+    }
+
+    public function import(ImportAccountsRequest $request): JsonResponse
+    {
+        $this->authorize('create', FinancialAccount::class);
+
+        $result = $this->imports->importXlsx(
+            $request->file('file'),
+            $request->string('cost_center_id')->toString(),
+            $request->user(),
+        );
+
+        return $this->success($result, 'Importação concluída.');
     }
 
     public function update(UpdateAccountRequest $request, FinancialAccount $account): JsonResponse

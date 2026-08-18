@@ -74,7 +74,7 @@ class ReconciliationService
      *
      * @return array{matched: int, ambiguous: int, not_found: int}
      */
-    public function autoReconcile(User $user, ?string $costCenterId = null): array
+    public function autoReconcile(User $user, ?string $costCenterId = null, ?string $from = null, ?string $to = null): array
     {
         $pending = BankTransaction::query()
             ->where('status', 'pending')
@@ -87,7 +87,7 @@ class ReconciliationService
         $notFound = 0;
 
         foreach ($pending as $transaction) {
-            $candidates = $this->candidates($transaction);
+            $candidates = $this->candidates($transaction, $from, $to);
 
             if ($candidates->count() === 1) {
                 $this->link($transaction, $candidates->first(), $user);
@@ -103,14 +103,28 @@ class ReconciliationService
     }
 
     /**
+     * Busca lançamentos candidatos à conciliação com uma transação.
+     *
+     * O match é feito apenas por valor (e centro de custo); a data
+     * é usada somente como filtro opcional de período (vencimento).
+     *
      * @return Collection<int, FinancialAccount>
      */
-    public function candidates(BankTransaction $transaction): Collection
+    public function candidates(BankTransaction $transaction, ?string $from = null, ?string $to = null): Collection
     {
-        return FinancialAccount::query()
+        $query = FinancialAccount::query()
             ->whereIn('status', [AccountStatus::Open->value, AccountStatus::Partial->value])
-            ->where('cost_center_id', $transaction->cost_center_id)
-            ->where(fn ($q) => $q->whereDate('due_date', $transaction->date->toDateString())->orWhereDate('expected_date', $transaction->date->toDateString()))
+            ->where('cost_center_id', $transaction->cost_center_id);
+
+        if (filled($from)) {
+            $query->whereDate('due_date', '>=', $from);
+        }
+
+        if (filled($to)) {
+            $query->whereDate('due_date', '<=', $to);
+        }
+
+        return $query
             ->get()
             ->filter(fn (FinancialAccount $account) => abs($account->remaining_amount - (float) $transaction->value) < 0.005);
     }
@@ -182,7 +196,9 @@ class ReconciliationService
     /**
      * Cria uma receita ou despesa a partir de uma transação sem correspondente (RF019).
      *
-     * @param  array{type: string, description: string, category_id: string, observation?: ?string}  $data
+     * Campos não informados são preenchidos automaticamente a partir do extrato.
+     *
+     * @param  array{type: string, description: string, category_id: string, cost_center_id?: ?string, value?: ?numeric, due_date?: ?string, observation?: ?string}  $data
      */
     public function createFromTransaction(BankTransaction $transaction, array $data, User $user): FinancialAccount
     {
@@ -194,10 +210,10 @@ class ReconciliationService
             $account = FinancialAccount::query()->create([
                 'type' => $data['type'],
                 'description' => $data['description'],
-                'cost_center_id' => $transaction->cost_center_id,
+                'cost_center_id' => $data['cost_center_id'] ?? $transaction->cost_center_id,
                 'category_id' => $data['category_id'],
-                'value' => $transaction->value,
-                'due_date' => $transaction->date->toDateString(),
+                'value' => $data['value'] ?? $transaction->value,
+                'due_date' => $data['due_date'] ?? $transaction->date->toDateString(),
                 'observation' => $data['observation'] ?? null,
                 'status' => AccountStatus::Open,
             ]);

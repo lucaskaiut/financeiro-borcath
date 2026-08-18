@@ -47,6 +47,9 @@ export const Permission = {
   REPORTS_EXPORT: 'reports.export',
 
   AUDIT_VIEW: 'audit.view',
+
+  ASSISTANT_VIEW: 'assistant.view',
+  ASSISTANT_CONFIGURE: 'assistant.configure',
 } as const
 
 export type Permission = (typeof Permission)[keyof typeof Permission]
@@ -149,5 +152,12 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     label: 'Auditoria',
     permissions: [{ value: Permission.AUDIT_VIEW, label: 'Visualizar auditoria' }],
+  },
+  {
+    label: 'Assistente de IA',
+    permissions: [
+      { value: Permission.ASSISTANT_VIEW, label: 'Usar o assistente de IA' },
+      { value: Permission.ASSISTANT_CONFIGURE, label: 'Configurar integração de IA' },
+    ],
   },
 ]

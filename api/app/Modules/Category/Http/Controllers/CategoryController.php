@@ -37,7 +37,7 @@ class CategoryController extends ApiController
     {
         $this->authorize('view', $category);
 
-        return $this->success(CategoryResource::make($category));
+        return $this->success(CategoryResource::make($category->load(['parent', 'children'])));
     }
 
     public function store(StoreCategoryRequest $request): JsonResponse
@@ -54,7 +54,7 @@ class CategoryController extends ApiController
             ['name' => $category->name, 'type' => $category->type?->value],
         );
 
-        return $this->created(CategoryResource::make($category), 'Categoria criada com sucesso.');
+        return $this->created(CategoryResource::make($category->load('parent')), 'Categoria criada com sucesso.');
     }
 
     public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
@@ -71,7 +71,7 @@ class CategoryController extends ApiController
             ['name' => $category->name],
         );
 
-        return $this->success(CategoryResource::make($category), 'Categoria atualizada com sucesso.');
+        return $this->success(CategoryResource::make($category->load('parent')), 'Categoria atualizada com sucesso.');
     }
 
     public function destroy(Request $request, Category $category): JsonResponse

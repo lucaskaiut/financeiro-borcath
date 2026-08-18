@@ -10,6 +10,8 @@ class CategoryService
     public function paginate(int $perPage = 15, ?string $search = null, ?string $type = null): LengthAwarePaginator
     {
         return Category::query()
+            ->with('parent:id,uuid,name')
+            ->withCount('children')
             ->when(filled($type), fn ($query) => $query->where('type', $type))
             ->when(filled($search), fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
@@ -22,6 +24,7 @@ class CategoryService
     public function all(?string $type = null): array
     {
         return Category::query()
+            ->with('parent:id,uuid,name')
             ->when(filled($type), fn ($query) => $query->where('type', $type))
             ->orderBy('name')
             ->get()

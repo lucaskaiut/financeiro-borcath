@@ -25,15 +25,19 @@ export const reconciliationService = {
     return response.data.data
   },
 
-  async auto(): Promise<{ matched: number; ambiguous: number; not_found: number }> {
-    const response = await http.post<ApiResponse<{ matched: number; ambiguous: number; not_found: number }>>('/reconciliation/auto')
+  async auto(from?: string, to?: string): Promise<{ matched: number; ambiguous: number; not_found: number }> {
+    const response = await http.post<ApiResponse<{ matched: number; ambiguous: number; not_found: number }>>(
+      '/reconciliation/auto',
+      { from, to },
+    )
 
     return response.data.data
   },
 
-  async candidates(id: string): Promise<{ transaction: BankTransaction; candidates: Account[] }> {
+  async candidates(id: string, from?: string, to?: string): Promise<{ transaction: BankTransaction; candidates: Account[] }> {
     const response = await http.get<ApiResponse<{ transaction: BankTransaction; candidates: Account[] }>>(
       `/reconciliation/transactions/${id}/candidates`,
+      { params: { from, to } },
     )
 
     return response.data.data
@@ -61,7 +65,14 @@ export const reconciliationService = {
 
   async createAccount(
     id: string,
-    payload: { type: 'payable' | 'receivable'; description: string; category_id: string },
+    payload: {
+      type: 'payable' | 'receivable'
+      description: string
+      category_id: string
+      cost_center_id?: string
+      value?: number
+      due_date?: string
+    },
   ): Promise<Account> {
     const response = await http.post<ApiResponse<Account>>(`/reconciliation/transactions/${id}/create-account`, payload)
 

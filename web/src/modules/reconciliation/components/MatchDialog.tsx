@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,6 +15,7 @@ import {
 } from '@/shared/design-system'
 import { formatCurrency, formatDate } from '@/shared/utils/format'
 import { useCategoryOptions } from '@/modules/categories/hooks/useCategories'
+import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import type { BankTransaction } from '@/shared/types/models'
 import { useCandidates, useCreateAccountFromTransaction, useReconcile } from '../hooks/useReconciliation'
 
@@ -22,32 +23,61 @@ const createSchema = z.object({
   type: z.enum(['payable', 'receivable']),
   description: z.string().min(1, 'Informe a descrição'),
   category_id: z.string().min(1, 'Selecione a categoria'),
+  cost_center_id: z.string().min(1, 'Selecione o centro de custo'),
+  value: z.string().refine((v) => v !== '' && Number(v) > 0, 'Informe um valor válido'),
+  due_date: z.string().min(1, 'Informe a data'),
 })
 
 type CreateFormValues = z.infer<typeof createSchema>
 
 export function MatchDialog({
   transaction,
+  from,
+  to,
   open,
   onClose,
 }: {
   transaction: BankTransaction | null
+  from: string
+  to: string
   open: boolean
   onClose: () => void
 }) {
-  const candidates = useCandidates(open && transaction ? transaction.id : undefined)
+  const candidates = useCandidates(open && transaction ? transaction.id : undefined, from || undefined, to || undefined)
   const reconcile = useReconcile()
   const createAccount = useCreateAccountFromTransaction()
+  const costCenters = useCostCenterOptions()
 
   const [creating, setCreating] = useState(false)
 
   const form = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { type: 'payable', description: '', category_id: '' },
+    defaultValues: {
+      type: 'payable',
+      description: '',
+      category_id: '',
+      cost_center_id: '',
+      value: '',
+      due_date: '',
+    },
   })
+
+  useEffect(() => {
+    if (!transaction) return
+
+    form.reset({
+      type: transaction.type === 'credit' ? 'receivable' : 'payable',
+      description: transaction.description ?? '',
+      category_id: '',
+      cost_center_id: transaction.cost_center_id ?? '',
+      value: String(transaction.value ?? ''),
+      due_date: transaction.date ?? '',
+    })
+  }, [transaction, form])
 
   const type = form.watch('type')
   const categories = useCategoryOptions(type === 'receivable' ? 'income' : 'expense')
+  const topLevelCategories = (categories.data ?? []).filter((c) => c.parent_id === null)
 
   const hasCandidates = (candidates.data?.candidates.length ?? 0) > 0
 
@@ -60,7 +90,14 @@ export function MatchDialog({
     if (!transaction) return
     await createAccount.mutateAsync({
       id: transaction.id,
-      payload: { type: values.type, description: values.description, category_id: values.category_id },
+      payload: {
+        type: values.type,
+        description: values.description,
+        category_id: values.category_id,
+        cost_center_id: values.cost_center_id || undefined,
+        value: Number(values.value),
+        due_date: values.due_date,
+      },
     })
     onClose()
   }
@@ -111,6 +148,11 @@ export function MatchDialog({
 
       {!candidates.isPending && creating && (
         <Form form={form} onSubmit={handleCreate} className="space-y-4">
+          {transaction && (
+            <p className="text-[13px] text-muted">
+              Os campos foram preenchidos com os dados do extrato — você pode ajustá-los antes de criar o lançamento.
+            </p>
+          )}
           <RadioGroupField
             name="type"
             options={[
@@ -118,8 +160,13 @@ export function MatchDialog({
               { value: 'receivable', label: 'Receita' },
             ]}
           />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField name="value" label="Valor" type="number" step="0.01" min="0" required />
+            <TextField name="due_date" label="Data de vencimento" type="date" required />
+          </div>
+          <SelectField name="cost_center_id" label="Centro de custo" options={costCenters.data ?? []} placeholder="Selecione" required />
           <TextField name="description" label="Descrição" required />
-          <SelectField name="category_id" label="Categoria" options={categories.data ?? []} placeholder="Selecione" required />
+          <SelectField name="category_id" label="Categoria" options={topLevelCategories.map((c) => ({ value: c.value, label: c.label }))} placeholder="Selecione" required />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setCreating(false)}>
               Voltar

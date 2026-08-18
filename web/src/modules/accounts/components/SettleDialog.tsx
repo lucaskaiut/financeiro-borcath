@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, Form, Modal, TextField } from '@/shared/design-system'
-import { formatCurrency } from '@/shared/utils/format'
+import { formatCurrency, toLocalIsoDate } from '@/shared/utils/format'
 import type { Account } from '@/shared/types/models'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
@@ -32,13 +32,13 @@ export function SettleDialog({
     resolver: zodResolver(settleSchema),
     defaultValues: {
       value: account ? String(account.remaining_amount) : '',
-      settled_at: new Date().toISOString().slice(0, 10),
+      settled_at: toLocalIsoDate(),
       method: '',
     },
     values: account
       ? {
           value: String(account.remaining_amount),
-          settled_at: new Date().toISOString().slice(0, 10),
+          settled_at: toLocalIsoDate(),
           method: '',
         }
       : undefined,

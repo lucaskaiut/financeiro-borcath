@@ -63,9 +63,16 @@ export default function CategoriesListPage() {
       key: 'name',
       header: 'Categoria',
       render: (c) => (
-        <div className="flex items-center gap-2.5">
-          <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: c.color ?? '#e2e8f0' }} />
-          <span className="font-medium text-foreground">{c.name}</span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: c.color ?? '#e2e8f0' }} />
+            <span className="font-medium text-foreground">{c.name}</span>
+            {c.parent_name && <Badge variant="neutral">Subcategoria</Badge>}
+          </div>
+          {c.parent_name && <p className="pl-[22px] text-[13px] text-muted">Subcategoria de {c.parent_name}</p>}
+          {!c.parent_name && (c.subcategories_count ?? 0) > 0 && (
+            <p className="pl-[22px] text-[13px] text-muted">{c.subcategories_count} subcategoria(s)</p>
+          )}
         </div>
       ),
     },

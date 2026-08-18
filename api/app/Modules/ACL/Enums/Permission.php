@@ -53,6 +53,9 @@ enum Permission: string
 
     case AUDIT_VIEW = 'audit.view';
 
+    case ASSISTANT_VIEW = 'assistant.view';
+    case ASSISTANT_CONFIGURE = 'assistant.configure';
+
     /**
      * @return list<string>
      */
@@ -80,6 +83,7 @@ enum Permission: string
             self::CASH_FLOW_VIEW,
             self::RECONCILIATION_VIEW,
             self::REPORTS_VIEW,
+            self::ASSISTANT_VIEW,
         ];
     }
 }

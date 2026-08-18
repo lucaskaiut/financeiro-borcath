@@ -9,6 +9,7 @@ export interface AccountPayload {
   counterparty?: string | null
   cost_center_id: string
   category_id: string
+  subcategory_id?: string | null
   value: number
   due_date: string
   expected_date?: string | null
@@ -39,6 +40,16 @@ export const accountsService = {
     const response = await http.post<ApiResponse<Account[]>>('/accounts', payload)
 
     return response.data
+  },
+
+  async importXlsx(file: File, cost_center_id: string): Promise<{ imported: number; skipped: number }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('cost_center_id', cost_center_id)
+
+    const response = await http.post<ApiResponse<{ imported: number; skipped: number }>>('/accounts/import', formData)
+
+    return response.data.data
   },
 
   async update(id: string, payload: Partial<AccountPayload>): Promise<Account> {

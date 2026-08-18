@@ -2,6 +2,9 @@
 
 use App\Modules\Account\Http\Controllers\AccountController;
 use App\Modules\ACL\Http\Controllers\RoleController;
+use App\Modules\Assistant\Http\Controllers\AiSettingsController;
+use App\Modules\Assistant\Http\Controllers\ChatController;
+use App\Modules\Assistant\Http\Controllers\ConversationController;
 use App\Modules\Audit\Http\Controllers\AuditLogController;
 use App\Modules\Auth\Http\Controllers\AuthController;
 use App\Modules\CashFlow\Http\Controllers\CashFlowController;
@@ -18,7 +21,6 @@ use App\Modules\User\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
-    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
     Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
@@ -66,6 +68,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     // Contas a pagar / receber
     Route::get('accounts', [AccountController::class, 'index'])->middleware('permission:accounts.view');
     Route::post('accounts', [AccountController::class, 'store'])->middleware('permission:accounts.create');
+    Route::post('accounts/import', [AccountController::class, 'import'])->middleware('permission:accounts.create');
     Route::get('accounts/{account}', [AccountController::class, 'show'])->middleware('permission:accounts.view');
     Route::match(['put', 'patch'], 'accounts/{account}', [AccountController::class, 'update'])->middleware('permission:accounts.update');
     Route::delete('accounts/{account}', [AccountController::class, 'destroy'])->middleware('permission:accounts.delete');
@@ -110,4 +113,17 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     // Auditoria
     Route::get('audit', [AuditLogController::class, 'index'])->middleware('permission:audit.view');
+
+    // Assistente financeiro com IA
+    Route::get('assistant/suggestions', [ConversationController::class, 'suggestions'])->middleware('permission:assistant.view');
+    Route::get('assistant/conversations', [ConversationController::class, 'index'])->middleware('permission:assistant.view');
+    Route::post('assistant/conversations', [ConversationController::class, 'store'])->middleware('permission:assistant.view');
+    Route::get('assistant/conversations/{conversation}', [ConversationController::class, 'show'])->middleware('permission:assistant.view');
+    Route::match(['put', 'patch'], 'assistant/conversations/{conversation}', [ConversationController::class, 'update'])->middleware('permission:assistant.view');
+    Route::delete('assistant/conversations/{conversation}', [ConversationController::class, 'destroy'])->middleware('permission:assistant.view');
+    Route::post('assistant/conversations/{conversation}/messages', [ChatController::class, 'send'])->middleware('permission:assistant.view');
+
+    Route::get('assistant/settings', [AiSettingsController::class, 'show'])->middleware('permission:assistant.configure');
+    Route::match(['put', 'patch'], 'assistant/settings', [AiSettingsController::class, 'update'])->middleware('permission:assistant.configure');
+    Route::post('assistant/settings/test', [AiSettingsController::class, 'test'])->middleware('permission:assistant.configure');
 });

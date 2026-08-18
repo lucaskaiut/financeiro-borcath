@@ -69,6 +69,9 @@ export interface Category {
   type_label: string
   color: string | null
   status: string
+  parent_id: string | null
+  parent_name?: string | null
+  subcategories_count?: number | null
   created_at: string | null
   updated_at: string | null
 }
@@ -91,6 +94,8 @@ export interface Account {
   cost_center: string | null
   category_id: string | null
   category: { name: string; color: string | null; type: string } | null
+  subcategory_id: string | null
+  subcategory?: { name: string } | null
   value: number
   settled_amount: number
   remaining_amount: number
@@ -168,5 +173,42 @@ export interface AuditLog {
   ip: string | null
   user: { id: string; name: string; email: string } | null
   created_at: string | null
+}
+
+export interface ConversationSummary {
+  id: string
+  title: string
+  message_count: number | null
+  last_message: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AssistantMessage {
+  id: string
+  role: 'user' | 'assistant' | 'tool' | 'system'
+  content: string
+  tool_calls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> | null
+  tool_results: Array<{ id: string; name: string }> | null
+  created_at: string | null
+}
+
+export interface Conversation {
+  id: string
+  title: string
+  messages: AssistantMessage[]
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AiSettings {
+  enabled: boolean
+  endpoint: string | null
+  model: string | null
+  temperature: number | null
+  max_tokens: number | null
+  system_prompt: string | null
+  has_api_key: boolean
+  configured: boolean
 }
 

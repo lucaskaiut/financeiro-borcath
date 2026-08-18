@@ -29,6 +29,7 @@ class FinancialAccount extends Model
         'counterparty',
         'cost_center_id',
         'category_id',
+        'subcategory_id',
         'value',
         'due_date',
         'expected_date',
@@ -73,6 +74,11 @@ class FinancialAccount extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id', 'uuid');
+    }
+
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'subcategory_id', 'uuid');
     }
 
     public function recurrence(): BelongsTo

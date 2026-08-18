@@ -17,7 +17,7 @@ import {
 } from '@/shared/design-system'
 import { Can } from '@/app/guards/PermissionGuard'
 import { Permission } from '@/shared/constants/permissions'
-import { formatCurrency, formatDate } from '@/shared/utils/format'
+import { formatCurrency, formatDate, toLocalIsoDate } from '@/shared/utils/format'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import {
   useCashFlowStatement,
@@ -40,7 +40,7 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id']
 
-const today = new Date().toISOString().slice(0, 10)
+const today = toLocalIsoDate()
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<TabId>('daily')

@@ -1,6 +1,5 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link } from 'react-router'
 import { Alert, Button, Card, CardContent, Form, TextField } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
@@ -58,13 +57,6 @@ export default function LoginPage() {
             Entrar
           </Button>
         </Form>
-
-        <p className="mt-6 text-center text-sm text-muted">
-          Ainda não tem uma conta?{' '}
-          <Link to="/auth/register" className="font-medium text-primary hover:text-primary-hover">
-            Criar conta
-          </Link>
-        </p>
       </CardContent>
     </Card>
   )

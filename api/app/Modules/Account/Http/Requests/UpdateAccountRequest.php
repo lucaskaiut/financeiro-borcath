@@ -3,6 +3,7 @@
 namespace App\Modules\Account\Http\Requests;
 
 use App\Modules\Account\Enums\AccountType;
+use App\Modules\Category\Models\Category;
 use App\Modules\Tenant\Support\Facades\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -35,6 +36,13 @@ class UpdateAccountRequest extends FormRequest
                 'string',
                 Rule::exists('categories', 'uuid')->where(fn ($q) => $q->where('tenant_id', TenantContext::tenantId())),
             ],
+            'subcategory_id' => [
+                'nullable',
+                'string',
+                Rule::exists('categories', 'uuid')->where(fn ($q) => $q
+                    ->where('tenant_id', TenantContext::tenantId())
+                    ->whereNotNull('parent_id')),
+            ],
             'value' => ['sometimes', 'required', 'numeric', 'gt:0'],
             'due_date' => ['sometimes', 'required', 'date'],
             'expected_date' => ['nullable', 'date'],
@@ -46,6 +54,26 @@ class UpdateAccountRequest extends FormRequest
     {
         if ($this->filled('value')) {
             $this->merge(['value' => (float) $this->input('value')]);
+        }
+
+        $this->fillCategoryFromSubcategory();
+    }
+
+    private function fillCategoryFromSubcategory(): void
+    {
+        if (! $this->filled('subcategory_id')) {
+            return;
+        }
+
+        $subcategory = Category::query()
+            ->where('uuid', $this->input('subcategory_id'))
+            ->whereNotNull('parent_id')
+            ->first();
+
+        $parent = $subcategory?->parent;
+
+        if ($parent !== null) {
+            $this->merge(['category_id' => $parent->uuid]);
         }
     }
 }

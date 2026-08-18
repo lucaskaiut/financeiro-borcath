@@ -36,9 +36,13 @@ class ReconciliationController extends ApiController
         return $this->paginated(BankTransactionResource::collection($transactions));
     }
 
-    public function candidates(BankTransaction $transaction): JsonResponse
+    public function candidates(BankTransaction $transaction, Request $request): JsonResponse
     {
-        $candidates = $this->service->candidates($transaction);
+        $candidates = $this->service->candidates(
+            $transaction,
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+        );
 
         return $this->success([
             'transaction' => BankTransactionResource::make($transaction->load('costCenter:id,uuid,name')),
@@ -69,6 +73,8 @@ class ReconciliationController extends ApiController
         $result = $this->service->autoReconcile(
             $request->user(),
             $request->string('cost_center_id')->toString() ?: null,
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
         );
 
         $this->audit->recordEntity(

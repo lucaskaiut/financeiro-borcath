@@ -5,7 +5,7 @@ import { useSessionStore } from '@/shared/stores/session.store'
 import { useTenantContextStore } from '@/shared/stores/tenant.store'
 import { toast } from '@/shared/stores/toast.store'
 
-const GUEST_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/me']
+const GUEST_ENDPOINTS = ['/auth/login', '/auth/me']
 
 /**
  * Instância central de HTTP.

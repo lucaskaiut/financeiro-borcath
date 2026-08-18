@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Crypt;
 
 class Tenant extends Model
 {
@@ -25,6 +26,13 @@ class Tenant extends Model
         'email',
         'phone',
         'domain',
+        'ai_enabled',
+        'ai_endpoint',
+        'ai_api_key',
+        'ai_model',
+        'ai_temperature',
+        'ai_max_tokens',
+        'ai_system_prompt',
     ];
 
     public function parent(): BelongsTo
@@ -47,9 +55,38 @@ class Tenant extends Model
         return $this->hasMany(Role::class);
     }
 
+    protected function casts(): array
+    {
+        return [
+            'ai_enabled' => 'boolean',
+            'ai_temperature' => 'decimal:2',
+            'ai_max_tokens' => 'integer',
+        ];
+    }
+
     public function isUmbrella(): bool
     {
         return $this->parent_id === null;
+    }
+
+    public function getAiApiKeyAttribute(?string $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    public function setAiApiKeyAttribute(?string $value): void
+    {
+        $this->attributes['ai_api_key'] = filled($value)
+            ? Crypt::encryptString($value)
+            : null;
     }
 
     protected static function newFactory(): TenantFactory

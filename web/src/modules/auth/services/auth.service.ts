@@ -10,32 +10,10 @@ export interface LoginPayload {
   password: string
 }
 
-export interface RegisterPayload {
-  tenant: {
-    name: string
-    document: string
-    email: string
-    phone: string
-    domain: string
-  }
-  user: {
-    name: string
-    email: string
-    phone: string
-    document: string
-    password: string
-  }
-}
-
 export const authService = {
   async login(payload: LoginPayload): Promise<void> {
     await ensureCsrfCookie()
     await http.post('/auth/login', payload)
-  },
-
-  async register(payload: RegisterPayload): Promise<void> {
-    await ensureCsrfCookie()
-    await http.post('/auth/register', payload)
   },
 
   async logout(): Promise<void> {

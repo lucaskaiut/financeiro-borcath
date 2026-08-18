@@ -43,6 +43,7 @@ export default function AccountEditPage() {
               counterparty: query.data.counterparty ?? '',
               cost_center_id: query.data.cost_center_id ?? '',
               category_id: query.data.category_id ?? '',
+              subcategory_id: query.data.subcategory_id ?? '',
               value: String(query.data.value),
               due_date: query.data.due_date ?? '',
               expected_date: query.data.expected_date ?? '',

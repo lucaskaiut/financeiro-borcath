@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Modules\ACL\Models\Role;
 use App\Modules\ACL\Policies\RolePolicy;
+use App\Modules\Assistant\Models\Conversation;
+use App\Modules\Assistant\Policies\ConversationPolicy;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Policies\TenantPolicy;
 use App\Modules\User\Models\User;
@@ -43,7 +45,6 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip());
         });
 
-
     }
 
     private function configurePolicies(): void
@@ -51,5 +52,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(Conversation::class, ConversationPolicy::class);
     }
 }

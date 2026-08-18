@@ -13,7 +13,8 @@ class OfxParser
     {
         $content = $this->normalize($content);
 
-        if (! preg_match_all('/<STMTTRN>(.*?)<\/STMTTRN>/is', $content, $matches)) {
+        // Aceita OFX 1.x (SGML) e 2.x (XML): STMTTRN pode ou não ser fechado.
+        if (! preg_match_all('/<STMTTRN>(.*?)(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>|$)/is', $content, $matches)) {
             return [];
         }
 
@@ -52,7 +53,11 @@ class OfxParser
 
     private function value(string $block, string $tag): ?string
     {
-        if (preg_match('/<'.preg_quote($tag, '/').'>(.*?)<\/'.preg_quote($tag, '/').'>/is', $block, $m)) {
+        $tag = preg_quote($tag, '/');
+
+        // OFX 1.x (SGML) costuma não fechar as tags internas; OFX 2.x (XML) fecha.
+        // Captura o conteúdo até o fechamento, até a próxima tag ou até o fim do bloco.
+        if (preg_match('/<'.$tag.'>(.*?)(?:<\/'.$tag.'>|(?=<)|$)/is', $block, $m)) {
             return trim($m[1]);
         }
 

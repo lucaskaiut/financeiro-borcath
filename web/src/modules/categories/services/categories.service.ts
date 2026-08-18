@@ -7,6 +7,7 @@ export interface CategoryPayload {
   type: 'income' | 'expense'
   color?: string | null
   status?: string
+  parent_id?: string | null
 }
 
 export const categoriesService = {

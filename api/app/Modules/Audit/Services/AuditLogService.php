@@ -58,6 +58,7 @@ class AuditLogService
     public function paginate(int $perPage = 15, ?string $action = null): LengthAwarePaginator
     {
         return AuditLog::query()
+            ->where('selected_tenant_id', TenantContext::tenantId())
             ->with('user:id,uuid,name,email')
             ->when(filled($action), fn ($query) => $query->where('action', $action))
             ->orderByDesc('created_at')

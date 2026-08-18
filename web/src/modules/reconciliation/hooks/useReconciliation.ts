@@ -11,10 +11,10 @@ export function useReconciliationQuery(params: ReconciliationListParams) {
   })
 }
 
-export function useCandidates(id: string | undefined) {
+export function useCandidates(id: string | undefined, from?: string, to?: string) {
   return useQuery({
-    queryKey: queryKeys.reconciliation.candidates(id ?? ''),
-    queryFn: () => reconciliationService.candidates(id!),
+    queryKey: queryKeys.reconciliation.candidates(id ?? '', from, to),
+    queryFn: () => reconciliationService.candidates(id!, from, to),
     enabled: !!id,
   })
 }
@@ -43,7 +43,7 @@ export function useAutoReconcile() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: () => reconciliationService.auto(),
+    mutationFn: ({ from, to }: { from?: string; to?: string }) => reconciliationService.auto(from, to),
     onSuccess: (result) => {
       invalidate(queryClient)
       toast.success('Conciliação automática', `${result.matched} conciliadas, ${result.ambiguous} ambíguas, ${result.not_found} sem correspondente.`)
@@ -91,8 +91,20 @@ export function useCreateAccountFromTransaction() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { type: 'payable' | 'receivable'; description: string; category_id: string } }) =>
-      reconciliationService.createAccount(id, payload),
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string
+      payload: {
+        type: 'payable' | 'receivable'
+        description: string
+        category_id: string
+        cost_center_id?: string
+        value?: number
+        due_date?: string
+      }
+    }) => reconciliationService.createAccount(id, payload),
     onSuccess: () => {
       invalidate(queryClient)
       toast.success('Lançamento criado', 'O lançamento foi criado a partir do extrato.')
