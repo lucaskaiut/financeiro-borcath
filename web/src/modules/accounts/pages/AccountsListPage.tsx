@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Banknote, CheckCircle2, FileUp, Pencil, Plus, Trash2, Undo2, XCircle } from 'lucide-react'
 import {
@@ -61,13 +61,18 @@ const STATUS_OPTIONS = [
 export default function AccountsListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
+  const [dueFrom, setDueFrom] = useState(searchParams.get('due_from') ?? '')
+  const [dueTo, setDueTo] = useState(searchParams.get('due_to') ?? '')
   const debouncedSearch = useDebounce(search)
   const page = Number(searchParams.get('page') ?? 1)
   const type = searchParams.get('type') ?? ''
   const status = searchParams.get('status') ?? ''
   const costCenterId = searchParams.get('cost_center_id') ?? ''
-  const dueFrom = searchParams.get('due_from') ?? ''
-  const dueTo = searchParams.get('due_to') ?? ''
+
+  useEffect(() => {
+    setDueFrom(searchParams.get('due_from') ?? '')
+    setDueTo(searchParams.get('due_to') ?? '')
+  }, [searchParams])
 
   const navigate = useNavigate()
   const { can } = usePermissions()
@@ -306,7 +311,10 @@ export default function AccountsListPage() {
                   id="due_from"
                   type="date"
                   value={dueFrom}
-                  onChange={(e) => updateParams({ due_from: e.target.value })}
+                  onChange={(e) => {
+                    setDueFrom(e.target.value)
+                    updateParams({ due_from: e.target.value })
+                  }}
                   className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
                 />
               </div>
@@ -316,7 +324,10 @@ export default function AccountsListPage() {
                   id="due_to"
                   type="date"
                   value={dueTo}
-                  onChange={(e) => updateParams({ due_to: e.target.value })}
+                  onChange={(e) => {
+                    setDueTo(e.target.value)
+                    updateParams({ due_to: e.target.value })
+                  }}
                   className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
                 />
               </div>
