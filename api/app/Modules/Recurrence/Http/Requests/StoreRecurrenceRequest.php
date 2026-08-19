@@ -3,6 +3,7 @@
 namespace App\Modules\Recurrence\Http\Requests;
 
 use App\Modules\Account\Enums\AccountType;
+use App\Modules\Category\Models\Category;
 use App\Modules\Recurrence\Enums\RecurrenceFrequency;
 use App\Modules\Tenant\Support\Facades\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
@@ -34,6 +35,13 @@ class StoreRecurrenceRequest extends FormRequest
                 'string',
                 Rule::exists('categories', 'uuid')->where(fn ($q) => $q->where('tenant_id', TenantContext::tenantId())),
             ],
+            'subcategory_id' => [
+                'nullable',
+                'string',
+                Rule::exists('categories', 'uuid')->where(fn ($q) => $q
+                    ->where('tenant_id', TenantContext::tenantId())
+                    ->whereNotNull('parent_id')),
+            ],
             'value' => ['required', 'numeric', 'gt:0'],
             'frequency' => ['required', 'string', Rule::in(RecurrenceFrequency::values())],
             'start_date' => ['required', 'date'],
@@ -47,6 +55,26 @@ class StoreRecurrenceRequest extends FormRequest
     {
         if ($this->filled('value')) {
             $this->merge(['value' => (float) $this->input('value')]);
+        }
+
+        $this->fillCategoryFromSubcategory();
+    }
+
+    private function fillCategoryFromSubcategory(): void
+    {
+        if (! $this->filled('subcategory_id')) {
+            return;
+        }
+
+        $subcategory = Category::query()
+            ->where('uuid', $this->input('subcategory_id'))
+            ->whereNotNull('parent_id')
+            ->first();
+
+        $parent = $subcategory?->parent;
+
+        if ($parent !== null) {
+            $this->merge(['category_id' => $parent->uuid]);
         }
     }
 }

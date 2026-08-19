@@ -14,7 +14,7 @@ class RecurrenceService
     public function paginate(int $perPage = 15, ?string $search = null): LengthAwarePaginator
     {
         return Recurrence::query()
-            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name'])
+            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name', 'subcategory:id,uuid,name'])
             ->withCount('accounts')
             ->when(filled($search), fn ($query) => $query->where('description', 'like', "%{$search}%"))
             ->orderBy('description')
@@ -22,7 +22,7 @@ class RecurrenceService
     }
 
     /**
-     * @param  array{type: string, description: string, counterparty?: ?string, cost_center_id: string, category_id: string, value: numeric, frequency: string, start_date: string, end_date?: ?string, max_occurrences?: ?int, day_of_month?: ?int, status?: string}  $data
+     * @param  array{type: string, description: string, counterparty?: ?string, cost_center_id: string, category_id: string, subcategory_id?: ?string, value: numeric, frequency: string, start_date: string, end_date?: ?string, max_occurrences?: ?int, day_of_month?: ?int, status?: string}  $data
      */
     public function create(array $data): Recurrence
     {
@@ -88,6 +88,7 @@ class RecurrenceService
                 'counterparty' => $recurrence->counterparty,
                 'cost_center_id' => $recurrence->cost_center_id,
                 'category_id' => $recurrence->category_id,
+                'subcategory_id' => $recurrence->subcategory_id,
                 'value' => $recurrence->value,
                 'due_date' => $date->toDateString(),
                 'recurrence_id' => $recurrence->getKey(),

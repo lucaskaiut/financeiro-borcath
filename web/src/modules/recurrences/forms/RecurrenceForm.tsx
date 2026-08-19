@@ -1,4 +1,5 @@
-import { useForm, useWatch } from 'react-hook-form'
+import { useCallback, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
@@ -7,14 +8,16 @@ import {
   CardContent,
   Form,
   RadioGroupField,
+  SearchSelectField,
   Section,
   SelectField,
   TextField,
+  type SearchSelectOption,
 } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
-import { useCategoryOptions } from '@/modules/categories/hooks/useCategories'
+import { categoriesService } from '@/modules/categories/services/categories.service'
 import { recurrenceSchema, type RecurrenceFormValues } from '../schemas/recurrence.schema'
 import type { RecurrencePayload } from '../services/recurrences.service'
 
@@ -45,6 +48,7 @@ export function RecurrenceForm({ mode, defaultValues, submitting, onSubmit }: Re
       counterparty: '',
       cost_center_id: '',
       category_id: '',
+      subcategory_id: '',
       value: '',
       frequency: 'monthly',
       start_date: '',
@@ -56,9 +60,53 @@ export function RecurrenceForm({ mode, defaultValues, submitting, onSubmit }: Re
     },
   })
 
-  const type = useWatch({ control: form.control, name: 'type' })
+  const [selectedSubcategory, setSelectedSubcategory] = useState<SearchSelectOption | null>(null)
+
+  const type = form.watch('type')
+  const categoryType = type === 'receivable' ? 'income' : 'expense'
+
   const costCenters = useCostCenterOptions()
-  const categories = useCategoryOptions(type === 'receivable' ? 'income' : 'expense')
+
+  const loadCategories = useCallback(
+    async (search: string): Promise<SearchSelectOption[]> => {
+      const result = await categoriesService.list({
+        search: search || undefined,
+        type: categoryType,
+        parent: 'root',
+        per_page: 20,
+      })
+
+      return result.data.map((category) => ({ value: category.id, label: category.name }))
+    },
+    [categoryType],
+  )
+
+  const loadSubcategories = useCallback(
+    async (search: string): Promise<SearchSelectOption[]> => {
+      const result = await categoriesService.list({
+        search: search || undefined,
+        type: categoryType,
+        parent: form.getValues('category_id') || 'sub',
+        per_page: 20,
+      })
+
+      return result.data.map((category) => ({
+        value: category.id,
+        label: category.name,
+        parent_id: category.parent_id,
+      }))
+    },
+    [categoryType, form],
+  )
+
+  const resolveLabel = useCallback(async (id: string): Promise<SearchSelectOption | null> => {
+    try {
+      const category = await categoriesService.get(id)
+      return { value: category.id, label: category.name }
+    } catch {
+      return null
+    }
+  }, [])
 
   const handleSubmit = async (values: RecurrenceFormValues) => {
     try {
@@ -68,6 +116,7 @@ export function RecurrenceForm({ mode, defaultValues, submitting, onSubmit }: Re
         counterparty: values.counterparty || null,
         cost_center_id: values.cost_center_id,
         category_id: values.category_id,
+        subcategory_id: values.subcategory_id || null,
         value: Number(values.value),
         frequency: values.frequency,
         start_date: values.start_date,
@@ -102,7 +151,35 @@ export function RecurrenceForm({ mode, defaultValues, submitting, onSubmit }: Re
               <TextField name="description" label="Descrição" required className="sm:col-span-2" />
               <TextField name="counterparty" label={type === 'receivable' ? 'Cliente' : 'Fornecedor'} className="sm:col-span-2" />
               <SelectField name="cost_center_id" label="Centro de custo" options={costCenters.data ?? []} placeholder="Selecione" required />
-              <SelectField name="category_id" label="Categoria" options={categories.data ?? []} placeholder="Selecione" required />
+              <SearchSelectField
+                name="category_id"
+                label="Categoria"
+                loadOptions={loadCategories}
+                resolveLabel={resolveLabel}
+                placeholder="Buscar categoria..."
+                required
+                onSelectOption={(option) => {
+                  const subcategoryId = form.getValues('subcategory_id')
+                  if (subcategoryId && selectedSubcategory?.parent_id !== option.value) {
+                    form.setValue('subcategory_id', '')
+                    setSelectedSubcategory(null)
+                  }
+                }}
+              />
+              <SearchSelectField
+                name="subcategory_id"
+                label="Subcategoria"
+                loadOptions={loadSubcategories}
+                resolveLabel={resolveLabel}
+                placeholder="Buscar subcategoria..."
+                onSelectOption={(option) => {
+                  setSelectedSubcategory(option)
+                  const categoryId = form.getValues('category_id')
+                  if (option.parent_id && option.parent_id !== categoryId) {
+                    form.setValue('category_id', option.parent_id)
+                  }
+                }}
+              />
               <TextField name="value" label="Valor" type="number" step="0.01" min="0" required />
               <SelectField name="frequency" label="Frequência" options={FREQUENCY_OPTIONS} required />
               <TextField name="start_date" label="Data inicial" type="date" required />

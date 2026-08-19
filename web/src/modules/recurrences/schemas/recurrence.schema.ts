@@ -6,6 +6,7 @@ export const recurrenceSchema = z.object({
   counterparty: z.string(),
   cost_center_id: z.string().min(1, 'Selecione o centro de custo'),
   category_id: z.string().min(1, 'Selecione a categoria'),
+  subcategory_id: z.string(),
   value: z.string().refine((v) => v !== '' && Number(v) > 0, 'Informe um valor maior que zero'),
   frequency: z.string().min(1, 'Selecione a frequência'),
   start_date: z.string().min(1, 'Informe a data inicial'),

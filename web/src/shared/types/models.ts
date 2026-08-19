@@ -125,6 +125,8 @@ export interface Recurrence {
   cost_center: string | null
   category_id: string | null
   category: string | null
+  subcategory_id: string | null
+  subcategory: string | null
   value: number
   frequency: string
   frequency_label: string

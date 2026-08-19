@@ -8,6 +8,7 @@ export interface RecurrencePayload {
   counterparty?: string | null
   cost_center_id: string
   category_id: string
+  subcategory_id?: string | null
   value: number
   frequency: string
   start_date: string

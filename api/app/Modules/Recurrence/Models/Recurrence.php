@@ -25,6 +25,7 @@ class Recurrence extends Model
         'counterparty',
         'cost_center_id',
         'category_id',
+        'subcategory_id',
         'value',
         'frequency',
         'start_date',
@@ -52,6 +53,11 @@ class Recurrence extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id', 'uuid');
+    }
+
+    public function subcategory(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'subcategory_id', 'uuid');
     }
 
     public function accounts(): HasMany

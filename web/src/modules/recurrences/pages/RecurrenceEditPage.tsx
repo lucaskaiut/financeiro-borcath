@@ -43,6 +43,7 @@ export default function RecurrenceEditPage() {
               counterparty: query.data.counterparty ?? '',
               cost_center_id: query.data.cost_center_id ?? '',
               category_id: query.data.category_id ?? '',
+              subcategory_id: query.data.subcategory_id ?? '',
               value: String(query.data.value),
               frequency: query.data.frequency,
               start_date: query.data.start_date,

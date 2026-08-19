@@ -25,6 +25,8 @@ class RecurrenceResource extends JsonResource
             'cost_center' => $this->whenLoaded('costCenter', fn () => $this->costCenter?->name),
             'category_id' => $this->category?->uuid,
             'category' => $this->whenLoaded('category', fn () => $this->category?->name),
+            'subcategory_id' => $this->subcategory?->uuid,
+            'subcategory' => $this->whenLoaded('subcategory', fn () => $this->subcategory?->name),
             'value' => (float) $this->value,
             'frequency' => $this->frequency?->value,
             'frequency_label' => $this->frequency?->label(),
