@@ -44,9 +44,9 @@ export function useImportAccounts() {
   return useMutation({
     mutationFn: ({ file, costCenterId }: { file: File; costCenterId: string }) =>
       accountsService.importXlsx(file, costCenterId),
-    onSuccess: (result) => {
+    onSuccess: () => {
       invalidateAccounts(queryClient)
-      toast.success('Importação concluída', `${result.imported} contas importadas, ${result.skipped} ignoradas.`)
+      toast.success('Importação iniciada', 'A planilha será processada em segundo plano. Atualize a lista em instantes.')
     },
   })
 }

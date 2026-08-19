@@ -42,14 +42,12 @@ export const accountsService = {
     return response.data
   },
 
-  async importXlsx(file: File, cost_center_id: string): Promise<{ imported: number; skipped: number }> {
+  async importXlsx(file: File, cost_center_id: string): Promise<void> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('cost_center_id', cost_center_id)
 
-    const response = await http.post<ApiResponse<{ imported: number; skipped: number }>>('/accounts/import', formData)
-
-    return response.data.data
+    await http.post('/accounts/import', formData)
   },
 
   async update(id: string, payload: Partial<AccountPayload>): Promise<Account> {
