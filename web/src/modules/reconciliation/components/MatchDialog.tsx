@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,12 +9,14 @@ import {
   Form,
   Modal,
   RadioGroupField,
+  SearchSelectField,
   SelectField,
   Skeleton,
   TextField,
+  type SearchSelectOption,
 } from '@/shared/design-system'
 import { formatCurrency, formatDate } from '@/shared/utils/format'
-import { useCategoryOptions } from '@/modules/categories/hooks/useCategories'
+import { categoriesService } from '@/modules/categories/services/categories.service'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import type { BankTransaction } from '@/shared/types/models'
 import { useCandidates, useCreateAccountFromTransaction, useReconcile } from '../hooks/useReconciliation'
@@ -76,8 +78,21 @@ export function MatchDialog({
   }, [transaction, form])
 
   const type = form.watch('type')
-  const categories = useCategoryOptions(type === 'receivable' ? 'income' : 'expense')
-  const topLevelCategories = (categories.data ?? []).filter((c) => c.parent_id === null)
+  const categoryType = type === 'receivable' ? 'income' : 'expense'
+
+  const loadCategories = useCallback(
+    async (search: string): Promise<SearchSelectOption[]> => {
+      const result = await categoriesService.list({
+        search: search || undefined,
+        type: categoryType,
+        parent: 'root',
+        per_page: 20,
+      })
+
+      return result.data.map((category) => ({ value: category.id, label: category.name }))
+    },
+    [categoryType],
+  )
 
   const hasCandidates = (candidates.data?.candidates.length ?? 0) > 0
 
@@ -166,7 +181,13 @@ export function MatchDialog({
           </div>
           <SelectField name="cost_center_id" label="Centro de custo" options={costCenters.data ?? []} placeholder="Selecione" required />
           <TextField name="description" label="Descrição" required />
-          <SelectField name="category_id" label="Categoria" options={topLevelCategories.map((c) => ({ value: c.value, label: c.label }))} placeholder="Selecione" required />
+          <SearchSelectField
+            name="category_id"
+            label="Categoria"
+            loadOptions={loadCategories}
+            placeholder="Buscar categoria..."
+            required
+          />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="secondary" onClick={() => setCreating(false)}>
               Voltar

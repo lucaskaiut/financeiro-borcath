@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useCallback } from 'react'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
@@ -8,13 +8,15 @@ import {
   CardContent,
   Form,
   RadioGroupField,
+  SearchSelectField,
   Section,
   SelectField,
   TextField,
+  type SearchSelectOption,
 } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
-import { useCategoryOptions } from '../hooks/useCategories'
+import { categoriesService } from '../services/categories.service'
 import { categorySchema, type CategoryFormValues } from '../schemas/category.schema'
 import type { CategoryPayload } from '../services/categories.service'
 
@@ -53,15 +55,26 @@ export function CategoryForm({ mode, defaultValues, submitting, onSubmit }: Cate
     },
   })
 
-  const parentId = useWatch({ control: form.control, name: 'parent_id' })
-  const categories = useCategoryOptions()
-  const parentOptions = (categories.data ?? []).filter((c) => c.parent_id === null)
+  const parentId = form.watch('parent_id')
 
-  useEffect(() => {
-    if (!parentId) return
-    const parent = parentOptions.find((option) => option.value === parentId)
-    if (parent) form.setValue('type', parent.type)
-  }, [parentId, parentOptions, form])
+  const loadParentCategories = useCallback(async (search: string): Promise<SearchSelectOption[]> => {
+    const result = await categoriesService.list({
+      search: search || undefined,
+      parent: 'root',
+      per_page: 20,
+    })
+
+    return result.data.map((category) => ({ value: category.id, label: category.name, type: category.type }))
+  }, [])
+
+  const resolveParentLabel = useCallback(async (id: string): Promise<SearchSelectOption | null> => {
+    try {
+      const category = await categoriesService.get(id)
+      return { value: category.id, label: category.name }
+    } catch {
+      return null
+    }
+  }, [])
 
   const handleSubmit = async (values: CategoryFormValues) => {
     try {
@@ -86,12 +99,16 @@ export function CategoryForm({ mode, defaultValues, submitting, onSubmit }: Cate
           <Section title="Dados da categoria">
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField name="name" label="Nome" placeholder="Ex.: Fornecedores" required className="sm:col-span-2" />
-              <SelectField
+              <SearchSelectField
                 name="parent_id"
                 label="Categoria pai"
-                options={parentOptions.map((option) => ({ value: option.value, label: option.label }))}
-                placeholder="Nenhuma (categoria principal)"
+                loadOptions={loadParentCategories}
+                resolveLabel={resolveParentLabel}
+                placeholder="Buscar categoria principal..."
                 hint="Selecione uma categoria pai para criar uma subcategoria."
+                onSelectOption={(option) => {
+                  if (option.type) form.setValue('type', option.type as CategoryFormValues['type'])
+                }}
               />
               <SelectField name="color" label="Cor" options={COLOR_OPTIONS} />
               <SelectField name="status" label="Status" options={STATUS_OPTIONS} required />

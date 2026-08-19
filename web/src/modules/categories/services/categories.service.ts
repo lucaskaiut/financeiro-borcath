@@ -11,7 +11,7 @@ export interface CategoryPayload {
 }
 
 export const categoriesService = {
-  async list(params: ListParams & { type?: string }): Promise<PaginatedResponse<Category>> {
+  async list(params: ListParams & { type?: string; parent?: string }): Promise<PaginatedResponse<Category>> {
     const response = await http.get<PaginatedResponse<Category>>('/categories', { params })
 
     return response.data

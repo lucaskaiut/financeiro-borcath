@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useCallback, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
@@ -8,16 +8,18 @@ import {
   CardContent,
   Form,
   RadioGroupField,
+  SearchSelectField,
   Section,
   SelectField,
   SwitchField,
   TextareaField,
   TextField,
+  type SearchSelectOption,
 } from '@/shared/design-system'
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
-import { useCategoryOptions } from '@/modules/categories/hooks/useCategories'
+import { categoriesService } from '@/modules/categories/services/categories.service'
 import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
 import type { AccountPayload } from '../services/accounts.service'
 
@@ -49,33 +51,54 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
     },
   })
 
-  const type = useWatch({ control: form.control, name: 'type' })
-  const categoryId = useWatch({ control: form.control, name: 'category_id' })
-  const subcategoryId = useWatch({ control: form.control, name: 'subcategory_id' })
-  const installments = useWatch({ control: form.control, name: 'installments' })
+  const [selectedSubcategory, setSelectedSubcategory] = useState<SearchSelectOption | null>(null)
+
+  const type = form.watch('type')
+  const installments = form.watch('installments')
+  const categoryType = type === 'receivable' ? 'income' : 'expense'
 
   const costCenters = useCostCenterOptions()
-  const categories = useCategoryOptions(type === 'receivable' ? 'income' : 'expense')
-  const topLevelCategories = (categories.data ?? []).filter((c) => c.parent_id === null)
-  const subcategories = (categories.data ?? []).filter((c) => c.parent_id !== null)
 
-  // Ao selecionar uma subcategoria, preenche a categoria automaticamente.
-  useEffect(() => {
-    if (!categories.isSuccess || !subcategoryId) return
-    const sub = subcategories.find((c) => c.value === subcategoryId)
-    if (sub && sub.parent_id && sub.parent_id !== categoryId) {
-      form.setValue('category_id', sub.parent_id)
-    }
-  }, [subcategoryId, categoryId, subcategories, categories.isSuccess, form])
+  const loadCategories = useCallback(
+    async (search: string): Promise<SearchSelectOption[]> => {
+      const result = await categoriesService.list({
+        search: search || undefined,
+        type: categoryType,
+        parent: 'root',
+        per_page: 20,
+      })
 
-  // Ao trocar a categoria, limpa a subcategoria se ela não pertencer à nova categoria.
-  useEffect(() => {
-    if (!categories.isSuccess || !subcategoryId || !categoryId) return
-    const sub = subcategories.find((c) => c.value === subcategoryId)
-    if (!sub || sub.parent_id !== categoryId) {
-      form.setValue('subcategory_id', '')
+      return result.data.map((category) => ({ value: category.id, label: category.name }))
+    },
+    [categoryType],
+  )
+
+  const loadSubcategories = useCallback(
+    async (search: string): Promise<SearchSelectOption[]> => {
+      const result = await categoriesService.list({
+        search: search || undefined,
+        type: categoryType,
+        parent: form.getValues('category_id') || 'sub',
+        per_page: 20,
+      })
+
+      return result.data.map((category) => ({
+        value: category.id,
+        label: category.name,
+        parent_id: category.parent_id,
+      }))
+    },
+    [categoryType, form],
+  )
+
+  const resolveLabel = useCallback(async (id: string): Promise<SearchSelectOption | null> => {
+    try {
+      const category = await categoriesService.get(id)
+      return { value: category.id, label: category.name }
+    } catch {
+      return null
     }
-  }, [categoryId, subcategoryId, subcategories, categories.isSuccess, form])
+  }, [])
 
   const handleSubmit = async (values: AccountFormValues) => {
     const payload: AccountPayload = {
@@ -133,18 +156,34 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
                 placeholder="Selecione"
                 required
               />
-              <SelectField
+              <SearchSelectField
                 name="category_id"
                 label="Categoria"
-                options={topLevelCategories.map((c) => ({ value: c.value, label: c.label }))}
-                placeholder="Selecione"
+                loadOptions={loadCategories}
+                resolveLabel={resolveLabel}
+                placeholder="Buscar categoria..."
                 required
+                onSelectOption={(option) => {
+                  const subcategoryId = form.getValues('subcategory_id')
+                  if (subcategoryId && selectedSubcategory?.parent_id !== option.value) {
+                    form.setValue('subcategory_id', '')
+                    setSelectedSubcategory(null)
+                  }
+                }}
               />
-              <SelectField
+              <SearchSelectField
                 name="subcategory_id"
                 label="Subcategoria"
-                options={subcategories.map((c) => ({ value: c.value, label: c.label }))}
-                placeholder="Sem subcategoria"
+                loadOptions={loadSubcategories}
+                resolveLabel={resolveLabel}
+                placeholder="Buscar subcategoria..."
+                onSelectOption={(option) => {
+                  setSelectedSubcategory(option)
+                  const categoryId = form.getValues('category_id')
+                  if (option.parent_id && option.parent_id !== categoryId) {
+                    form.setValue('category_id', option.parent_id)
+                  }
+                }}
               />
               <TextField name="value" label="Valor" type="number" step="0.01" min="0" required />
               <TextField name="due_date" label="Data de vencimento" type="date" required />

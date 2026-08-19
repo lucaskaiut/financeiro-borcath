@@ -12,6 +12,7 @@ import { Field } from './Field'
 import { Input, type InputProps } from './Input'
 import { Textarea, type TextareaProps } from './Textarea'
 import { Select, type SelectProps } from './Select'
+import { SearchSelect, type SearchSelectOption } from './SearchSelect'
 import { Checkbox } from './Checkbox'
 import { Switch } from './Switch'
 import { RadioGroup, type RadioOption } from './RadioGroup'
@@ -99,6 +100,56 @@ export function SelectField({
     <Field label={label} hint={hint} error={error} required={required} htmlFor={name} className={className}>
       <Select id={name} invalid={!!error} {...register(name)} {...props} />
     </Field>
+  )
+}
+
+export function SearchSelectField({
+  name,
+  label,
+  hint,
+  required,
+  className,
+  loadOptions,
+  resolveLabel,
+  placeholder,
+  emptyMessage,
+  disabled,
+  onSelectOption,
+}: BaseFieldProps & {
+  loadOptions: (search: string) => Promise<SearchSelectOption[]>
+  resolveLabel?: (value: string) => Promise<SearchSelectOption | null>
+  placeholder?: string
+  emptyMessage?: string
+  disabled?: boolean
+  onSelectOption?: (option: SearchSelectOption) => void
+}) {
+  const { control } = useFormContext()
+  const error = useFieldError(name)
+
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <SearchSelect
+          value={(field.value as string) ?? ''}
+          onChange={(value, option) => {
+            field.onChange(value)
+            if (option) onSelectOption?.(option)
+          }}
+          loadOptions={loadOptions}
+          resolveLabel={resolveLabel}
+          label={label}
+          hint={hint}
+          error={error}
+          required={required}
+          placeholder={placeholder}
+          emptyMessage={emptyMessage}
+          disabled={disabled}
+          className={className}
+        />
+      )}
+    />
   )
 }
 

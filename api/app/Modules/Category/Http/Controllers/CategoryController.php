@@ -28,6 +28,7 @@ class CategoryController extends ApiController
             (int) $request->integer('per_page', 15),
             $request->string('search')->toString() ?: null,
             $request->string('type')->toString() ?: null,
+            $request->string('parent')->toString() ?: null,
         );
 
         return $this->paginated(CategoryResource::collection($categories));
