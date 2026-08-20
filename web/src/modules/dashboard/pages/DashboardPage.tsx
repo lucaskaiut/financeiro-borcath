@@ -2,11 +2,8 @@ import type { LucideIcon } from 'lucide-react'
 import {
   AlertTriangle,
   ArrowDownLeft,
-  ArrowUpRight,
   CalendarClock,
   Landmark,
-  Scale,
-  TrendingUp,
   Wallet,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -82,8 +79,7 @@ function KpiCard({
 
 function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
   const mounted = useMounted()
-  const resultPositive = kpis.month_result >= 0
-  const projectedPositive = kpis.projected_30d >= 0
+  const projectedPositive = kpis.projected_7d >= 0
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -98,14 +94,6 @@ function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
       <KpiCard
         mounted={mounted}
         index={1}
-        label="Entradas do mês"
-        icon={ArrowUpRight}
-        value={formatCurrency(kpis.month_income)}
-        accent="bg-success-soft text-success"
-      />
-      <KpiCard
-        mounted={mounted}
-        index={2}
         label="Saídas do mês"
         icon={ArrowDownLeft}
         value={formatCurrency(kpis.month_expense)}
@@ -113,23 +101,7 @@ function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
       />
       <KpiCard
         mounted={mounted}
-        index={3}
-        label="Resultado do mês"
-        icon={Scale}
-        value={formatCurrency(kpis.month_result)}
-        accent={resultPositive ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}
-      />
-      <KpiCard
-        mounted={mounted}
-        index={4}
-        label="A receber (em aberto)"
-        icon={TrendingUp}
-        value={formatCurrency(kpis.receivable_open)}
-        accent="bg-success-soft text-success"
-      />
-      <KpiCard
-        mounted={mounted}
-        index={5}
+        index={2}
         label="A pagar (em aberto)"
         icon={ArrowDownLeft}
         value={formatCurrency(kpis.payable_open)}
@@ -137,7 +109,7 @@ function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
       />
       <KpiCard
         mounted={mounted}
-        index={6}
+        index={3}
         label="Vencidas"
         icon={AlertTriangle}
         value={formatCurrency(kpis.overdue_total)}
@@ -146,10 +118,10 @@ function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
       />
       <KpiCard
         mounted={mounted}
-        index={7}
-        label="Projeção 30 dias"
+        index={4}
+        label="Projeção 7 dias"
         icon={CalendarClock}
-        value={formatCurrency(kpis.projected_30d)}
+        value={formatCurrency(kpis.projected_7d)}
         hint={kpis.projected_balance !== null ? `Saldo projetado: ${formatCurrency(kpis.projected_balance)}` : undefined}
         accent={projectedPositive ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}
       />
@@ -183,7 +155,7 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="flex items-center gap-3">
               <Skeleton className="size-10 rounded-xl" />
@@ -267,16 +239,10 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardContent>
                   <CategoryBarList title="Despesas por categoria" rows={data.expense_by_category} accent="bg-danger" />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <CategoryBarList title="Receitas por categoria" rows={data.income_by_category} accent="bg-success" />
                 </CardContent>
               </Card>
 

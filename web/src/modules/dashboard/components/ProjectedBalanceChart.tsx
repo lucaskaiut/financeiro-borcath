@@ -26,7 +26,7 @@ export function ProjectedBalanceChart({ data }: { data: ProjectedDay[] }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-[13px] text-muted">
-        <span>Saldo projetado (30 dias)</span>
+        <span>Saldo projetado (7 dias)</span>
         <span className="font-medium text-foreground">
           {formatCurrency(values[values.length - 1] ?? 0)}
         </span>

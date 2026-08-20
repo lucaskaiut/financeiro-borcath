@@ -10,7 +10,7 @@ export interface DashboardKpis {
   payable_open: number
   overdue_total: number
   overdue_count: number
-  projected_30d: number
+  projected_7d: number
   projected_balance: number | null
 }
 

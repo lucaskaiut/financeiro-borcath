@@ -42,7 +42,7 @@ class DashboardService
             ->where('due_date', '<', $today)
             ->sortBy('due_date');
 
-        $projected = $this->cashFlow->projected(30, $costCenterId);
+        $projected = $this->cashFlow->projected(7, $costCenterId);
         $finalProjectedBalance = $projected['series'][count($projected['series']) - 1]['projected_balance'] ?? null;
 
         return [
@@ -61,7 +61,7 @@ class DashboardService
                 'payable_open' => round($payableOpen->sum(fn (FinancialAccount $a) => $a->value - $a->settlements_sum_value), 2),
                 'overdue_total' => round($overdue->sum(fn (FinancialAccount $a) => $a->value - $a->settlements_sum_value), 2),
                 'overdue_count' => $overdue->count(),
-                'projected_30d' => round($projected['total_in'] - $projected['total_out'], 2),
+                'projected_7d' => round($projected['total_in'] - $projected['total_out'], 2),
                 'projected_balance' => $finalProjectedBalance,
             ],
             'cash_flow_series' => $this->monthlyCashFlowSeries($costCenterId),
