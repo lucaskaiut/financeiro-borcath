@@ -96,6 +96,11 @@ class FinancialAccount extends Model
         return $this->hasMany(Settlement::class, 'account_id');
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(AccountDocument::class, 'account_id');
+    }
+
     public function reconciliations(): HasMany
     {
         return $this->hasMany(Reconciliation::class, 'account_id');

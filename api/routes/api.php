@@ -75,6 +75,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::post('accounts/{account}/settle', [AccountController::class, 'settle'])->middleware('permission:accounts.settle');
     Route::delete('accounts/{account}/settlements/{settlement}', [AccountController::class, 'unsettle'])->middleware('permission:accounts.settle');
     Route::post('accounts/{account}/cancel', [AccountController::class, 'cancel'])->middleware('permission:accounts.update');
+    Route::get('accounts/{account}/documents', [AccountController::class, 'indexDocuments'])->middleware('permission:accounts.view');
+    Route::post('accounts/{account}/documents', [AccountController::class, 'storeDocuments'])->middleware('permission:accounts.update');
+    Route::get('accounts/{account}/documents/{document}/download', [AccountController::class, 'downloadDocument'])->middleware('permission:accounts.view');
+    Route::delete('accounts/{account}/documents/{document}', [AccountController::class, 'destroyDocument'])->middleware('permission:accounts.update');
 
     // Recorrências
     Route::get('recurrences', [RecurrenceController::class, 'index'])->middleware('permission:recurrences.view');
@@ -110,6 +114,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('reports/by-category', [ReportController::class, 'byCategory'])->middleware('permission:reports.view');
     Route::get('reports/by-cost-center', [ReportController::class, 'byCostCenter'])->middleware('permission:reports.view');
     Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware('permission:reports.view');
+    Route::get('reports/payables', [ReportController::class, 'payables'])->middleware('permission:reports.view');
 
     // Auditoria
     Route::get('audit', [AuditLogController::class, 'index'])->middleware('permission:audit.view');

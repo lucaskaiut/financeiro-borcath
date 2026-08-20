@@ -22,12 +22,13 @@ import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenter
 import { categoriesService } from '@/modules/categories/services/categories.service'
 import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
 import type { AccountPayload } from '../services/accounts.service'
+import { PendingDocuments } from '../components/PendingDocuments'
 
 interface AccountFormProps {
   mode: 'create' | 'edit'
   defaultValues?: Partial<AccountFormValues>
   submitting: boolean
-  onSubmit: (payload: AccountPayload) => Promise<unknown>
+  onSubmit: (payload: AccountPayload, documents: File[]) => Promise<unknown>
 }
 
 export function AccountForm({ mode, defaultValues, submitting, onSubmit }: AccountFormProps) {
@@ -52,6 +53,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
   })
 
   const [selectedSubcategory, setSelectedSubcategory] = useState<SearchSelectOption | null>(null)
+  const [documents, setDocuments] = useState<File[]>([])
 
   const type = form.watch('type')
   const installments = form.watch('installments')
@@ -119,7 +121,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
     }
 
     try {
-      await onSubmit(payload)
+      await onSubmit(payload, mode === 'create' ? documents : [])
     } catch (error) {
       if (isApiError(error) && error.status === 422) {
         applyApiErrorsToForm(form, error)
@@ -212,6 +214,15 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
                   />
                 </div>
               )}
+            </Section>
+          )}
+
+          {mode === 'create' && (
+            <Section
+              title="Documentos"
+              description="Anexe faturas, boletos e comprovantes. Os arquivos serão salvos após a criação do lançamento."
+            >
+              <PendingDocuments files={documents} onChange={setDocuments} disabled={submitting} />
             </Section>
           )}
 

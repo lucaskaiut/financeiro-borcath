@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys, type AccountListParams } from '@/shared/constants/query-keys'
 import { toast } from '@/shared/stores/toast.store'
+import { isApiError } from '@/shared/api/errors'
 import { accountsService, type AccountPayload, type SettlePayload } from '../services/accounts.service'
 
 export function useAccountsQuery(params: AccountListParams) {
@@ -107,6 +108,46 @@ export function useCancelAccount() {
     onSuccess: () => {
       invalidateAccounts(queryClient)
       toast.success('Conta cancelada', 'A conta foi cancelada.')
+    },
+  })
+}
+
+export function useAccountDocuments(accountId: string) {
+  return useQuery({
+    queryKey: queryKeys.accounts.documents(accountId),
+    queryFn: () => accountsService.listDocuments(accountId),
+    enabled: !!accountId,
+  })
+}
+
+function invalidateDocuments(queryClient: ReturnType<typeof useQueryClient>, accountId: string) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.accounts.documents(accountId) })
+}
+
+export function useUploadDocuments(accountId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (files: File[]) => accountsService.uploadDocuments(accountId, files),
+    onSuccess: (documents) => {
+      invalidateDocuments(queryClient, accountId)
+      const count = documents.length
+      toast.success('Documentos anexados', count > 1 ? `${count} documentos anexados com sucesso.` : 'Documento anexado com sucesso.')
+    },
+    onError: (error) => {
+      toast.error('Falha no upload', isApiError(error) ? error.message : 'Não foi possível anexar os documentos.')
+    },
+  })
+}
+
+export function useDeleteDocument(accountId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (documentId: string) => accountsService.removeDocument(accountId, documentId),
+    onSuccess: () => {
+      invalidateDocuments(queryClient, accountId)
+      toast.success('Documento removido', 'O documento foi removido.')
     },
   })
 }

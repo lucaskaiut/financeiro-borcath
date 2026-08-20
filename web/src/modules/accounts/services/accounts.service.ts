@@ -1,6 +1,6 @@
 import { http } from '@/shared/api/http'
 import type { ApiResponse, PaginatedResponse } from '@/shared/types/api'
-import type { Account } from '@/shared/types/models'
+import type { Account, AccountDocument } from '@/shared/types/models'
 import type { AccountListParams } from '@/shared/constants/query-keys'
 
 export interface AccountPayload {
@@ -76,5 +76,24 @@ export const accountsService = {
     const response = await http.post<ApiResponse<Account>>(`/accounts/${id}/cancel`)
 
     return response.data.data
+  },
+
+  async listDocuments(id: string): Promise<AccountDocument[]> {
+    const response = await http.get<ApiResponse<AccountDocument[]>>(`/accounts/${id}/documents`)
+
+    return response.data.data
+  },
+
+  async uploadDocuments(id: string, files: File[]): Promise<AccountDocument[]> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files[]', file))
+
+    const response = await http.post<ApiResponse<AccountDocument[]>>(`/accounts/${id}/documents`, formData)
+
+    return response.data.data
+  },
+
+  async removeDocument(id: string, documentId: string): Promise<void> {
+    await http.delete(`/accounts/${id}/documents/${documentId}`)
   },
 }

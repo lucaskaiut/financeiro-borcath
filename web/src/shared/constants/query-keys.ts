@@ -32,6 +32,7 @@ export const queryKeys = {
     all: ['accounts'] as const,
     list: (params: AccountListParams) => ['accounts', 'list', params] as const,
     detail: (id: string) => ['accounts', 'detail', id] as const,
+    documents: (id: string) => ['accounts', 'detail', id, 'documents'] as const,
   },
 
   recurrences: {
@@ -65,6 +66,7 @@ export const queryKeys = {
     byCategory: (params: Record<string, unknown>) => ['reports', 'by-category', params] as const,
     byCostCenter: () => ['reports', 'by-cost-center'] as const,
     cashFlow: (params: Record<string, unknown>) => ['reports', 'cash-flow', params] as const,
+    payables: (params: Record<string, unknown>) => ['reports', 'payables', params] as const,
   },
 
   audit: {

@@ -7,8 +7,10 @@ use App\Modules\Account\Http\Requests\ImportAccountsRequest;
 use App\Modules\Account\Http\Requests\SettleAccountRequest;
 use App\Modules\Account\Http\Requests\StoreAccountRequest;
 use App\Modules\Account\Http\Requests\UpdateAccountRequest;
+use App\Modules\Account\Http\Resources\AccountDocumentResource;
 use App\Modules\Account\Http\Resources\AccountResource;
 use App\Modules\Account\Jobs\ImportAccountsJob;
+use App\Modules\Account\Models\AccountDocument;
 use App\Modules\Account\Models\AccountImport;
 use App\Modules\Account\Models\FinancialAccount;
 use App\Modules\Account\Models\Settlement;
@@ -19,7 +21,9 @@ use App\Modules\Shared\Http\Controllers\ApiController;
 use App\Modules\Tenant\Support\Facades\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountController extends ApiController
 {
@@ -220,5 +224,88 @@ class AccountController extends ApiController
         );
 
         return $this->success(AccountResource::make($account), 'Conta cancelada com sucesso.');
+    }
+
+    public function indexDocuments(FinancialAccount $account): JsonResponse
+    {
+        $this->authorize('view', $account);
+
+        $documents = $account->documents()->orderBy('created_at')->get();
+
+        return $this->success(AccountDocumentResource::collection($documents));
+    }
+
+    public function storeDocuments(Request $request, FinancialAccount $account): JsonResponse
+    {
+        $this->authorize('update', $account);
+
+        $request->validate([
+            'files' => ['required', 'array', 'min:1', 'max:20'],
+            'files.*' => [
+                'required',
+                'file',
+                'max:20480',
+                'mimes:pdf,jpg,jpeg,png,gif,webp,bmp,svg,doc,docx,xls,xlsx,csv,txt',
+            ],
+        ]);
+
+        $documents = [];
+
+        foreach ($request->file('files') as $file) {
+            $path = $file->store('documents', 'local');
+
+            if ($path === false) {
+                throw new \RuntimeException('Não foi possível armazenar o documento.');
+            }
+
+            $documents[] = $account->documents()->create([
+                'name' => $file->getClientOriginalName(),
+                'path' => $path,
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'user_id' => $request->user()?->getKey(),
+            ]);
+        }
+
+        return $this->created(AccountDocumentResource::collection($documents), 'Documentos anexados com sucesso.');
+    }
+
+    public function downloadDocument(Request $request, FinancialAccount $account, AccountDocument $document): StreamedResponse
+    {
+        $this->authorize('view', $account);
+
+        $this->ensureDocumentBelongsTo($account, $document);
+
+        $headers = ['Content-Type' => $document->mime_type ?: 'application/octet-stream'];
+
+        if (! Storage::disk('local')->exists($document->path)) {
+            abort(404, 'Documento não encontrado.');
+        }
+
+        if ($request->boolean('download')) {
+            return Storage::disk('local')->download($document->path, $document->name, $headers);
+        }
+
+        return Storage::disk('local')->response($document->path, $document->name, $headers);
+    }
+
+    public function destroyDocument(FinancialAccount $account, AccountDocument $document): JsonResponse
+    {
+        $this->authorize('update', $account);
+
+        $this->ensureDocumentBelongsTo($account, $document);
+
+        $document->delete();
+
+        return $this->success(null, 'Documento removido com sucesso.');
+    }
+
+    private function ensureDocumentBelongsTo(FinancialAccount $account, AccountDocument $document): void
+    {
+        if ($document->account_id !== $account->getKey()) {
+            throw ValidationException::withMessages([
+                'document' => ['Documento não pertence a esta conta.'],
+            ]);
+        }
     }
 }

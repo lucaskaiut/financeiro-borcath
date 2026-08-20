@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router'
 import { Banknote } from 'lucide-react'
 import { ButtonLink, Card, EmptyState, Page, PageContent, PageHeader, Skeleton } from '@/shared/design-system'
 import { AccountForm } from '../forms/AccountForm'
+import { DocumentsSection } from '../components/DocumentsSection'
 import { useAccountQuery, useUpdateAccount } from '../hooks/useAccounts'
 
 export default function AccountEditPage() {
@@ -35,29 +36,33 @@ export default function AccountEditPage() {
         )}
 
         {query.data && (
-          <AccountForm
-            mode="edit"
-            defaultValues={{
-              type: query.data.type,
-              description: query.data.description,
-              counterparty: query.data.counterparty ?? '',
-              cost_center_id: query.data.cost_center_id ?? '',
-              category_id: query.data.category_id ?? '',
-              subcategory_id: query.data.subcategory_id ?? '',
-              value: String(query.data.value),
-              due_date: query.data.due_date ?? '',
-              expected_date: query.data.expected_date ?? '',
-              observation: query.data.observation ?? '',
-              installments: false,
-              installment_quantity: '2',
-              installment_interval: 'monthly',
-            }}
-            submitting={update.isPending}
-            onSubmit={async (payload) => {
-              await update.mutateAsync(payload)
-              navigate('/accounts')
-            }}
-          />
+          <>
+            <AccountForm
+              mode="edit"
+              defaultValues={{
+                type: query.data.type,
+                description: query.data.description,
+                counterparty: query.data.counterparty ?? '',
+                cost_center_id: query.data.cost_center_id ?? '',
+                category_id: query.data.category_id ?? '',
+                subcategory_id: query.data.subcategory_id ?? '',
+                value: String(query.data.value),
+                due_date: query.data.due_date ?? '',
+                expected_date: query.data.expected_date ?? '',
+                observation: query.data.observation ?? '',
+                installments: false,
+                installment_quantity: '2',
+                installment_interval: 'monthly',
+              }}
+              submitting={update.isPending}
+              onSubmit={async (payload) => {
+                await update.mutateAsync(payload)
+                navigate('/accounts')
+              }}
+            />
+
+            <DocumentsSection accountId={query.data.id} />
+          </>
         )}
       </PageContent>
     </Page>

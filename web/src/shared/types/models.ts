@@ -84,6 +84,14 @@ export interface Settlement {
   created_at: string | null
 }
 
+export interface AccountDocument {
+  id: string
+  name: string
+  mime_type: string | null
+  size: number
+  created_at: string | null
+}
+
 export interface Account {
   id: string
   type: 'payable' | 'receivable'

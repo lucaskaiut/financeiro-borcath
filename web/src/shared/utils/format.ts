@@ -86,3 +86,17 @@ export function formatCurrency(value: string | number | null | undefined): strin
 
   return currencyFormatter.format(Number(value))
 }
+
+export function formatBytes(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—'
+
+  const bytes = Number(value)
+
+  if (bytes === 0) return '0 B'
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const amount = bytes / 1024 ** exponent
+
+  return `${amount.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${units[exponent]}`
+}

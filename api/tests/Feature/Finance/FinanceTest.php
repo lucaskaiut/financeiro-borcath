@@ -4,6 +4,8 @@ namespace Tests\Feature\Finance;
 
 use App\Modules\Account\Models\FinancialAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\Concerns\InteractsWithTenants;
 use Tests\TestCase;
@@ -317,5 +319,47 @@ OFX;
         $this->getJson('/api/reports/by-category')->assertOk();
         $this->getJson('/api/reports/by-cost-center')->assertOk();
         $this->getJson('/api/reports/cash-flow')->assertOk();
+        $this->getJson('/api/reports/payables')->assertOk();
+    }
+
+    public function test_account_documents_upload_list_preview_and_delete(): void
+    {
+        Storage::fake('local');
+
+        $tenant = $this->createTenantWithRoles();
+        Sanctum::actingAs($this->createAdmin($tenant));
+
+        $costCenterId = $this->createCostCenter();
+        $categoryId = $this->createCategory('expense');
+
+        $accountId = $this->postJson('/api/accounts', [
+            'type' => 'payable',
+            'description' => 'Compra com anexos',
+            'cost_center_id' => $costCenterId,
+            'category_id' => $categoryId,
+            'value' => 300,
+            'due_date' => '2026-09-01',
+        ])->json('data.0.id');
+
+        $pdf = UploadedFile::fake()->create('fatura.pdf', 2048, 'application/pdf');
+        $image = UploadedFile::fake()->create('nota.png', 1024, 'image/png');
+
+        $this->post("/api/accounts/{$accountId}/documents", [
+            'files' => [$pdf, $image],
+        ])->assertCreated()->assertJsonCount(2, 'data');
+
+        $documents = $this->getJson("/api/accounts/{$accountId}/documents")
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->json('data');
+
+        $firstId = $documents[0]['id'];
+
+        $this->get("/api/accounts/{$accountId}/documents/{$firstId}/download")->assertOk();
+        $this->get("/api/accounts/{$accountId}/documents/{$firstId}/download?download=1")->assertOk();
+
+        $this->deleteJson("/api/accounts/{$accountId}/documents/{$firstId}")->assertOk();
+
+        $this->getJson("/api/accounts/{$accountId}/documents")->assertOk()->assertJsonCount(1, 'data');
     }
 }
