@@ -185,7 +185,6 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const user = useSessionStore((state) => state.user)
-  const tenant = useSessionStore((state) => state.tenant)
   const [costCenterId, setCostCenterId] = useState('')
 
   const { data, isPending } = useDashboardSummary(costCenterId || undefined)
