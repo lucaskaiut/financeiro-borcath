@@ -168,8 +168,8 @@ export function AppLayout() {
   const openSidebar = useUiStore((state) => state.openSidebar)
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <div className="z-20 hidden shrink-0 shadow-card lg:block">
+    <div className="app-viewport-height flex overflow-hidden">
+      <div className="z-20 hidden h-full shrink-0 overflow-hidden shadow-card lg:block">
         <SidebarNavigation />
       </div>
 
@@ -189,7 +189,7 @@ export function AppLayout() {
         <SidebarNavigation onNavigate={closeSidebar} />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar>
           <button
             type="button"
@@ -206,7 +206,7 @@ export function AppLayout() {
           </div>
         </Topbar>
 
-        <main className="flex-1">
+        <main className="min-h-0 flex-1 overflow-y-auto">
           <Container className="pt-2">
             <Suspense fallback={<Loading />}>
               <Outlet />

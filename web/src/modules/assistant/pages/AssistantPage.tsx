@@ -137,7 +137,7 @@ export default function AssistantPage() {
   )
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
+    <div className="app-viewport-height flex overflow-hidden bg-background">
       <aside className="hidden w-72 shrink-0 border-r border-surface-3 md:block">{sidebar}</aside>
 
       {sidebarOpen && (

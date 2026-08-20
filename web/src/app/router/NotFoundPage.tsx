@@ -3,7 +3,7 @@ import { ButtonLink, EmptyState } from '@/shared/design-system'
 
 export function NotFoundPage() {
   return (
-    <div className="flex min-h-dvh items-center justify-center px-4">
+    <div className="app-viewport-height flex items-center justify-center px-4">
       <EmptyState
         icon={SearchX}
         title="Página não encontrada"

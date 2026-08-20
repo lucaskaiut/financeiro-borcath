@@ -29,7 +29,7 @@ export function Loading({ label = 'Carregando...' }: { label?: string }) {
 
 export function FullScreenLoading() {
   return (
-    <div className="flex h-dvh items-center justify-center bg-background" role="status">
+    <div className="app-viewport-height flex items-center justify-center bg-background" role="status">
       <Spinner className="size-7 text-primary" />
       <span className="sr-only">Carregando aplicação</span>
     </div>

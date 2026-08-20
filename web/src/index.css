@@ -88,10 +88,21 @@ html,
 body,
 #root {
   height: 100%;
+  overflow: hidden;
 }
 
 body {
   @apply bg-background font-sans text-[0.9375rem] text-foreground antialiased;
+}
+
+/*
+ * Altura de viewport com fallback: usa 100vh para navegadores mais antigos
+ * e 100dvh (altura dinâmica) quando suportado. Evita que a aplicação cresça
+ * além da tela e gere scroll vertical no body.
+ */
+.app-viewport-height {
+  height: 100vh;
+  height: 100dvh;
 }
 
 *:focus-visible {
