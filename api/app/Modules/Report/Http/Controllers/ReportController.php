@@ -56,4 +56,13 @@ class ReportController extends ApiController
             $request->string('cost_center_id')->toString() ?: null,
         ));
     }
+
+    public function payables(Request $request): JsonResponse
+    {
+        return $this->success($this->service->payables(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        ));
+    }
 }

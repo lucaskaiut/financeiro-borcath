@@ -2,7 +2,9 @@
 
 namespace App\Modules\Report\Services;
 
+use App\Modules\Account\Enums\AccountStatus;
 use App\Modules\Account\Enums\AccountType;
+use App\Modules\Account\Models\FinancialAccount;
 use App\Modules\Account\Models\Settlement;
 use App\Modules\CashFlow\Services\CashFlowService;
 use App\Modules\CostCenter\Models\CostCenter;
@@ -217,6 +219,69 @@ class ReportService
                 'projected_net' => round($projected['total_in'] - $projected['total_out'], 2),
                 'expected_final_balance' => round($realized['final_balance'] + $projected['total_in'] - $projected['total_out'], 2),
             ],
+        ];
+    }
+
+    /**
+     * Relatório de contas a pagar por centro de custo (RF029): contas em aberto
+     * (vencidas, do dia e futuras) para planejamento de pagamentos.
+     *
+     * @return array<string, mixed>
+     */
+    public function payables(?string $from = null, ?string $to = null, ?string $costCenterId = null): array
+    {
+        $from = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
+        $to = $to ? Carbon::parse($to)->endOfDay() : now()->endOfDay();
+        $today = now()->startOfDay();
+
+        $accounts = FinancialAccount::query()
+            ->with(['costCenter:id,uuid,name', 'category:id,uuid,name'])
+            ->withSum('settlements', 'value')
+            ->where('type', AccountType::Payable)
+            ->whereIn('status', [AccountStatus::Open->value, AccountStatus::Partial->value])
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->whereDate('due_date', '<=', $to->toDateString())
+            ->orderBy('due_date')
+            ->get();
+
+        $rows = [];
+        $totalOpen = 0.0;
+        $totalOverdue = 0.0;
+
+        foreach ($accounts as $account) {
+            $remaining = round((float) $account->value - (float) ($account->settlements_sum_value ?? 0), 2);
+            $isOverdue = $account->due_date->lt($today);
+
+            $rows[] = [
+                'id' => $account->uuid,
+                'description' => $account->description,
+                'counterparty' => $account->counterparty,
+                'cost_center' => $account->costCenter?->name,
+                'category' => $account->category?->name,
+                'value' => (float) $account->value,
+                'remaining_amount' => $remaining,
+                'due_date' => $account->due_date->toDateString(),
+                'installment' => $account->installment_total > 1 ? "{$account->installment_number}/{$account->installment_total}" : null,
+                'status' => $account->status->value,
+                'is_overdue' => $isOverdue,
+            ];
+
+            $totalOpen += $remaining;
+
+            if ($isOverdue) {
+                $totalOverdue += $remaining;
+            }
+        }
+
+        return [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'cost_center_id' => $costCenterId,
+            'cost_center' => $costCenterId ? CostCenter::query()->where('uuid', $costCenterId)->value('name') : null,
+            'accounts' => $rows,
+            'total_open' => round($totalOpen, 2),
+            'total_overdue' => round($totalOverdue, 2),
+            'count' => count($rows),
         ];
     }
 

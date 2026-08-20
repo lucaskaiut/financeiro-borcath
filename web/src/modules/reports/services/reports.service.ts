@@ -40,6 +40,31 @@ export interface CashFlowStatement {
   comparative: { realized_net: number; projected_net: number; expected_final_balance: number }
 }
 
+export interface PayableAccount {
+  id: string
+  description: string
+  counterparty: string | null
+  cost_center: string | null
+  category: string | null
+  value: number
+  remaining_amount: number
+  due_date: string
+  installment: string | null
+  status: string
+  is_overdue: boolean
+}
+
+export interface PayablesReport {
+  from: string
+  to: string
+  cost_center_id: string | null
+  cost_center: string | null
+  accounts: PayableAccount[]
+  total_open: number
+  total_overdue: number
+  count: number
+}
+
 export const reportsService = {
   async daily(params: { date?: string }): Promise<DailyReport> {
     const response = await http.get<ApiResponse<DailyReport>>('/reports/daily', { params })
@@ -68,6 +93,11 @@ export const reportsService = {
 
   async cashFlow(params: { from?: string; to?: string; days?: number; cost_center_id?: string }): Promise<CashFlowStatement> {
     const response = await http.get<ApiResponse<CashFlowStatement>>('/reports/cash-flow', { params })
+    return response.data.data
+  },
+
+  async payables(params: { from?: string; to?: string; cost_center_id?: string }): Promise<PayablesReport> {
+    const response = await http.get<ApiResponse<PayablesReport>>('/reports/payables', { params })
     return response.data.data
   },
 }

@@ -65,11 +65,11 @@ export function Modal({
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
         className={cn(
-          'animate-modal-in relative w-full rounded-2xl bg-surface shadow-pop',
+          'animate-modal-in relative flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-2xl bg-surface shadow-pop',
           SIZES[size],
         )}
       >
-        <div className="flex items-start justify-between gap-4 p-5 pb-0">
+        <div className="flex shrink-0 items-start justify-between gap-4 p-5 pb-0">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-foreground">{title}</h2>
             {description && <p className="mt-1 text-sm text-muted">{description}</p>}
@@ -85,8 +85,8 @@ export function Modal({
             </button>
           )}
         </div>
-        {children && <div className="p-5">{children}</div>}
-        {footer && <div className="flex justify-end gap-2 p-5 pt-0">{footer}</div>}
+        {children && <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>}
+        {footer && <div className="flex shrink-0 justify-end gap-2 p-5 pt-0">{footer}</div>}
       </div>
     </div>,
     document.body,

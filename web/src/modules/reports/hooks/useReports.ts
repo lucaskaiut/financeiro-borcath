@@ -43,3 +43,10 @@ export function useCashFlowStatement(params: { from?: string; to?: string; days?
     queryFn: () => reportsService.cashFlow(params),
   })
 }
+
+export function usePayablesReport(params: { from?: string; to?: string; cost_center_id?: string }) {
+  return useQuery({
+    queryKey: queryKeys.reports.payables(params),
+    queryFn: () => reportsService.payables(params),
+  })
+}

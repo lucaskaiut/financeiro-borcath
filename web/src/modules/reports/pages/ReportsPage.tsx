@@ -1,13 +1,15 @@
-import { useState } from 'react'
-import { BarChart3, Download } from 'lucide-react'
+import { Fragment, useState } from 'react'
+import { BarChart3, Check, ClipboardList, Download, Printer } from 'lucide-react'
 import {
   Badge,
   Button,
   Card,
   CardContent,
+  Checkbox,
   DataTable,
   DateRangeShortcuts,
   EmptyState,
+  Modal,
   Page,
   PageContent,
   PageHeader,
@@ -24,10 +26,11 @@ import {
   useCategoryReport,
   useCostCenterReport,
   useDailyReport,
+  usePayablesReport,
   useProvisionReport,
   useWeeklyReport,
 } from '../hooks/useReports'
-import type { CashFlowStatement, CostCenterReportRow } from '../services/reports.service'
+import type { CashFlowStatement, CostCenterReportRow, PayableAccount } from '../services/reports.service'
 
 const TABS = [
   { id: 'daily', label: 'Diário' },
@@ -36,6 +39,7 @@ const TABS = [
   { id: 'category', label: 'Por categoria' },
   { id: 'cost-center', label: 'Por centro de custo' },
   { id: 'cash-flow', label: 'Demonstrativo' },
+  { id: 'payables', label: 'Contas a pagar' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -77,6 +81,7 @@ export default function ReportsPage() {
         {tab === 'category' && <CategorySection />}
         {tab === 'cost-center' && <CostCenterSection />}
         {tab === 'cash-flow' && <CashFlowSection />}
+        {tab === 'payables' && <PayablesSection />}
       </PageContent>
     </Page>
   )
@@ -343,6 +348,435 @@ function CashFlowSection() {
           )
         )}
       </CardContent>
+    </Card>
+  )
+}
+
+interface CostCenterGroup {
+  costCenter: string
+  accounts: PayableAccount[]
+}
+
+function groupByCostCenter(accounts: PayableAccount[]): CostCenterGroup[] {
+  const map = new Map<string, PayableAccount[]>()
+
+  for (const account of accounts) {
+    const key = account.cost_center ?? 'Sem centro de custo'
+    const list = map.get(key) ?? []
+    list.push(account)
+    map.set(key, list)
+  }
+
+  return Array.from(map.entries())
+    .map(([costCenter, items]) => ({ costCenter, accounts: items }))
+    .sort((a, b) => a.costCenter.localeCompare(b.costCenter, 'pt-BR'))
+}
+
+function PayablesSection() {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [costCenterId, setCostCenterId] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [reportOpen, setReportOpen] = useState(false)
+  const costCenters = useCostCenterOptions()
+
+  const query = usePayablesReport({
+    from: from || undefined,
+    to: to || undefined,
+    cost_center_id: costCenterId || undefined,
+  })
+
+  const accounts = query.data?.accounts ?? []
+  const groups = groupByCostCenter(accounts)
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const allSelected = accounts.length > 0 && accounts.every((a) => selected.has(a.id))
+
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(accounts.map((a) => a.id)))
+  }
+
+  const overdueAccounts = accounts.filter((a) => a.is_overdue)
+  const nonOverdueAccounts = accounts.filter((a) => !a.is_overdue)
+  const selectedAccounts = nonOverdueAccounts.filter((a) => selected.has(a.id))
+  const remainingAccounts = nonOverdueAccounts.filter((a) => !selected.has(a.id))
+  const totalOverdue = overdueAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
+  const totalSelected = selectedAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
+  const totalRemaining = remainingAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
+  const totalAnalyzed = accounts.reduce((sum, a) => sum + a.remaining_amount, 0)
+
+  const reportGroups = groups.map((group) => ({
+    costCenter: group.costCenter,
+    overdue: group.accounts.filter((a) => a.is_overdue),
+    others: group.accounts.filter((a) => !a.is_overdue),
+  }))
+
+  const costCenterLabel = costCenterId
+    ? (costCenters.data?.find((c) => c.value === costCenterId)?.label ?? query.data?.cost_center ?? '')
+    : 'Todos os centros de custo'
+
+  const columnsFor = (group: CostCenterGroup, index: number): Array<Column<PayableAccount>> => {
+    const allInGroupSelected = group.accounts.every((a) => selected.has(a.id))
+
+    const toggleGroup = () => {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        if (allInGroupSelected) {
+          group.accounts.forEach((a) => next.delete(a.id))
+        } else {
+          group.accounts.forEach((a) => next.add(a.id))
+        }
+        return next
+      })
+    }
+
+    return [
+      {
+        key: 'select',
+        header: (
+          <Checkbox
+            id={`payables-select-all-${index}`}
+            checked={allInGroupSelected}
+            onChange={toggleGroup}
+            aria-label={`Selecionar todas de ${group.costCenter}`}
+          />
+        ),
+        render: (a) => (
+          <Checkbox
+            id={`payables-${a.id}`}
+            checked={selected.has(a.id)}
+            onChange={() => toggle(a.id)}
+            aria-label={`Selecionar ${a.description}`}
+          />
+        ),
+      },
+      {
+        key: 'due_date',
+        header: 'Vencimento',
+        render: (a) => (
+          <span className={a.is_overdue ? 'font-medium text-danger' : 'text-muted'}>{formatDate(a.due_date)}</span>
+        ),
+      },
+      {
+        key: 'description',
+        header: 'Descrição',
+        render: (a) => (
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">{a.description}</p>
+            {a.counterparty && <p className="truncate text-[13px] text-muted">{a.counterparty}</p>}
+          </div>
+        ),
+      },
+      {
+        key: 'category',
+        header: 'Categoria',
+        render: (a) => <span className="text-muted">{a.category ?? '—'}</span>,
+      },
+      {
+        key: 'installment',
+        header: 'Parcela',
+        render: (a) => (a.installment ? <Badge variant="neutral">{a.installment}</Badge> : <span className="text-muted">—</span>),
+      },
+      {
+        key: 'value',
+        header: 'Valor',
+        render: (a) => <span className="font-medium text-foreground">{formatCurrency(a.remaining_amount)}</span>,
+      },
+    ]
+  }
+
+  const exportCsv = () => {
+    const lines: string[] = [
+      ['Seção', 'Vencimento', 'Descrição', 'Categoria', 'Valor', 'Centro de custo'].join(';'),
+    ]
+
+    const byCostCenter = (a: PayableAccount, b: PayableAccount) =>
+      (a.cost_center ?? '').localeCompare(b.cost_center ?? '', 'pt-BR') || a.due_date.localeCompare(b.due_date)
+
+    for (const a of [...overdueAccounts].sort(byCostCenter)) {
+      lines.push(['Em atraso', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
+    }
+    for (const a of [...selectedAccounts].sort(byCostCenter)) {
+      lines.push(['A pagar hoje', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
+    }
+    for (const a of [...remainingAccounts].sort(byCostCenter)) {
+      lines.push(['Em aberto', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
+    }
+
+    lines.push('')
+    lines.push(['Total em atraso', '', '', '', totalOverdue.toFixed(2), ''].join(';'))
+    lines.push(['Total a pagar hoje', '', '', '', totalSelected.toFixed(2), ''].join(';'))
+    lines.push(['Total em aberto', '', '', '', totalRemaining.toFixed(2), ''].join(';'))
+    lines.push(['Valor geral analisado', '', '', '', totalAnalyzed.toFixed(2), ''].join(';'))
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'contas-a-pagar.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const printReport = () => {
+    const esc = (value: unknown) =>
+      String(value ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
+
+    const accountRow = (a: PayableAccount, marked: boolean) =>
+      `<tr><td${a.is_overdue ? ' style="color:#dc2626"' : ''}>${esc(a.due_date)}</td><td>${marked ? '✓ ' : ''}${esc(a.description)}</td><td>${esc(a.category ?? '—')}</td><td style="text-align:right">${esc(formatCurrency(a.remaining_amount))}</td></tr>`
+
+    const reportRows = reportGroups
+      .map((group) => {
+        const overdue = group.overdue.length
+          ? `<tr class="overdue"><td colspan="4">Em atraso</td></tr>
+          ${group.overdue.map((a) => accountRow(a, false)).join('')}`
+          : ''
+
+        const others = group.others.map((a) => accountRow(a, selected.has(a.id))).join('')
+
+        return `<tr class="cc"><td colspan="4">${esc(group.costCenter)}</td></tr>${overdue}${others}`
+      })
+      .join('')
+
+    const html = `<!doctype html>
+      <html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de contas a pagar</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
+        h1 { font-size: 20px; margin-bottom: 4px; }
+        h2 { font-size: 15px; margin: 0 0 16px; font-weight: normal; color: #444; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+        th { background: #f3f3f3; }
+        .cc td { background: #fafafa; font-weight: bold; }
+        .overdue td { color: #dc2626; font-weight: bold; }
+        .grand-total { margin-top: 24px; font-size: 13px; border-top: 2px solid #111; padding-top: 12px; }
+        .grand-total h3 { margin: 0 0 8px; }
+        .grand-total p { margin: 2px 0; }
+        .grand-total strong { font-size: 14px; }
+      </style></head><body>
+        <h1>Relatório de contas a pagar</h1>
+        <h2>Período: ${esc(formatDate(query.data?.from))} até ${esc(formatDate(query.data?.to))} · ${esc(costCenterLabel)}</h2>
+        <table>
+          <thead><tr><th>Vencimento</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${reportRows}
+          </tbody>
+        </table>
+        <div class="grand-total">
+          <h3>Resumo geral</h3>
+          <p>Qtd. contas em atraso: <strong>${overdueAccounts.length}</strong> — Valor em atraso: <strong>${esc(formatCurrency(totalOverdue))}</strong></p>
+          <p>Qtd. contas selecionadas: <strong>${selectedAccounts.length}</strong> — Valor selecionado: <strong>${esc(formatCurrency(totalSelected))}</strong></p>
+          <p>Qtd. contas em aberto: <strong>${remainingAccounts.length}</strong> — Valor em aberto: <strong>${esc(formatCurrency(totalRemaining))}</strong></p>
+          <p>Valor geral analisado: <strong>${esc(formatCurrency(totalAnalyzed))}</strong></p>
+        </div>
+      </body></html>`
+
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+
+    win.focus()
+    win.addEventListener('afterprint', () => win.close())
+    win.print()
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
+          <span className="text-muted">até</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
+          <Select
+            aria-label="Centro de custo"
+            className="w-52"
+            value={costCenterId}
+            onChange={(e) => setCostCenterId(e.target.value)}
+            options={[{ value: '', label: 'Todos os centros' }, ...(costCenters.data ?? [])]}
+          />
+        </div>
+
+        <DateRangeShortcuts
+          onApply={({ from: nextFrom, to: nextTo }) => {
+            setFrom(nextFrom)
+            setTo(nextTo)
+          }}
+        />
+
+        {query.isPending ? (
+          <Skeleton className="h-48" />
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Summary label="Em atraso" value={totalOverdue} accent="text-danger" />
+              <Summary label="Selecionadas p/ pagamento" value={totalSelected} accent="text-success" />
+              <Summary label="Permanecerão em aberto" value={totalRemaining} />
+              <Summary label="Valor geral analisado" value={totalAnalyzed} />
+            </div>
+
+            {accounts.length === 0 ? (
+              <EmptyState icon={ClipboardList} title="Sem contas em aberto no período" description="Não há contas a pagar para o filtro selecionado." />
+            ) : (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" onClick={toggleAll}>
+                    {allSelected ? 'Limpar seleção' : 'Selecionar todas'}
+                  </Button>
+                  <span className="text-[13px] text-muted">
+                    {selected.size} de {accounts.length} selecionadas
+                  </span>
+                </div>
+                {groups.map((group, index) => (
+                  <div key={group.costCenter}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-foreground">{group.costCenter}</h3>
+                      <span className="text-[13px] font-medium text-foreground">
+                        {formatCurrency(group.accounts.reduce((sum, a) => sum + a.remaining_amount, 0))}
+                      </span>
+                    </div>
+                    <DataTable columns={columnsFor(group, index)} rows={group.accounts} rowKey={(a) => a.id} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Can permission={Permission.REPORTS_EXPORT}>
+                <Button onClick={() => setReportOpen(true)}>
+                  <ClipboardList className="size-4" />
+                  Gerar relatório
+                </Button>
+              </Can>
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      <Modal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        title="Relatório de contas a pagar"
+        description={`Período: ${formatDate(query.data?.from)} até ${formatDate(query.data?.to)} · ${costCenterLabel}`}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReportOpen(false)}>
+              Fechar
+            </Button>
+            <Can permission={Permission.REPORTS_EXPORT}>
+              <Button variant="secondary" onClick={exportCsv}>
+                <Download className="size-4" />
+                Exportar CSV
+              </Button>
+              <Button onClick={printReport}>
+                <Printer className="size-4" />
+                Imprimir
+              </Button>
+            </Can>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-surface-2/60 text-left text-xs tracking-wide text-muted uppercase">
+                    <th className="px-4 py-2.5 font-medium">Vencimento</th>
+                    <th className="px-4 py-2.5 font-medium">Descrição</th>
+                    <th className="px-4 py-2.5 font-medium">Categoria</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportGroups.map((group) => (
+                    <Fragment key={group.costCenter}>
+                      <tr>
+                        <td colSpan={4} className="px-4 pt-3 pb-1 text-[13px] font-semibold text-foreground">
+                          {group.costCenter}
+                        </td>
+                      </tr>
+                      {group.overdue.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={4} className="px-4 py-1.5 text-[13px] font-medium text-danger">
+                              Em atraso
+                            </td>
+                          </tr>
+                          {group.overdue.map((a) => (
+                            <tr key={a.id}>
+                              <td className="px-4 py-1.5 text-danger">{formatDate(a.due_date)}</td>
+                              <td className="px-4 py-1.5">{a.description}</td>
+                              <td className="px-4 py-1.5 text-muted">{a.category ?? '—'}</td>
+                              <td className="px-4 py-1.5 text-right font-medium">{formatCurrency(a.remaining_amount)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                      {group.others.map((a) => (
+                        <tr key={a.id}>
+                          <td className="px-4 py-1.5 text-muted">{formatDate(a.due_date)}</td>
+                          <td className="px-4 py-1.5">
+                            {selected.has(a.id) && <Check className="mr-1.5 inline size-3.5 text-success" />}
+                            {a.description}
+                          </td>
+                          <td className="px-4 py-1.5 text-muted">{a.category ?? '—'}</td>
+                          <td className="px-4 py-1.5 text-right font-medium">{formatCurrency(a.remaining_amount)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <div className="rounded-xl bg-surface-2/60 p-4 text-sm">
+            <h3 className="mb-2 text-sm font-semibold text-foreground">Resumo geral</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Contas em atraso</span>
+              <span className="font-medium text-foreground">{overdueAccounts.length}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-muted">Valor em atraso</span>
+              <span className="font-medium text-danger">{formatCurrency(totalOverdue)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-muted">Contas selecionadas</span>
+              <span className="font-medium text-foreground">{selectedAccounts.length}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-muted">Valor selecionado</span>
+              <span className="font-medium text-foreground">{formatCurrency(totalSelected)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-muted">Contas em aberto</span>
+              <span className="font-medium text-foreground">{remainingAccounts.length}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-muted">Valor em aberto</span>
+              <span className="font-medium text-foreground">{formatCurrency(totalRemaining)}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-surface-3 pt-2">
+              <span className="font-semibold text-foreground">Valor geral analisado</span>
+              <span className="text-lg font-semibold text-foreground">{formatCurrency(totalAnalyzed)}</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </Card>
   )
 }
