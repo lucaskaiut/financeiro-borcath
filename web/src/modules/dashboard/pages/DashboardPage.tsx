@@ -227,7 +227,7 @@ export default function DashboardPage() {
     <Page>
       <PageHeader
         title={`Olá, ${user?.name.split(' ')[0] ?? ''}`}
-        description={`Visão geral da saúde financeira de ${tenant?.name ?? 'sua organização'}.`}
+        description={`Visão geral da saúde financeira.`}
       />
 
       <PageContent>
