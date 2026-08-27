@@ -25,10 +25,10 @@ class CashFlowController extends ApiController
 
     public function projected(Request $request): JsonResponse
     {
-        $days = (int) $request->integer('days', 30);
-
         $data = $this->service->projected(
-            min(max($days, 1), 365),
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            (int) $request->integer('days', 30),
             $request->string('cost_center_id')->toString() ?: null,
         );
 

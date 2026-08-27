@@ -16,7 +16,7 @@ export function useWeeklyReport(params: { from?: string; to?: string }) {
   })
 }
 
-export function useProvisionReport(params: { days?: number; cost_center_id?: string }) {
+export function useProvisionReport(params: { from?: string; to?: string; days?: number; cost_center_id?: string }) {
   return useQuery({
     queryKey: queryKeys.reports.provision(params),
     queryFn: () => reportsService.provision(params),

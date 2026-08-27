@@ -23,6 +23,7 @@ const ACTION_LABELS: Record<string, { label: string; variant: 'neutral' | 'prima
   'financial.delete': { label: 'Exclusão', variant: 'danger' },
   'account.settle': { label: 'Baixa', variant: 'success' },
   'account.unsettle': { label: 'Estorno de baixa', variant: 'warning' },
+  'account.reopen': { label: 'Reabertura de conta', variant: 'danger' },
   'installment.generate': { label: 'Parcelamento', variant: 'primary' },
   'recurrence.generate': { label: 'Recorrência', variant: 'primary' },
   'reconciliation.execute': { label: 'Conciliação', variant: 'success' },

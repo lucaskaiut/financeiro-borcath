@@ -1,6 +1,8 @@
 import { useNavigate, useParams } from 'react-router'
-import { Repeat } from 'lucide-react'
-import { ButtonLink, Card, EmptyState, Page, PageContent, PageHeader, Skeleton } from '@/shared/design-system'
+import { Copy, Repeat } from 'lucide-react'
+import { Button, ButtonLink, Card, EmptyState, Page, PageContent, PageHeader, Skeleton } from '@/shared/design-system'
+import { Can } from '@/app/guards/PermissionGuard'
+import { Permission } from '@/shared/constants/permissions'
 import { RecurrenceForm } from '../forms/RecurrenceForm'
 import { useRecurrenceQuery, useUpdateRecurrence } from '../hooks/useRecurrences'
 
@@ -20,6 +22,16 @@ export default function RecurrenceEditPage() {
           { label: 'Recorrências', to: '/recurrences' },
           { label: 'Editar' },
         ]}
+        actions={
+          query.data ? (
+            <Can permission={Permission.RECURRENCES_CREATE}>
+              <Button variant="secondary" onClick={() => navigate(`/recurrences/create?clone=${query.data!.id}`)}>
+                <Copy className="size-4" />
+                Clonar
+              </Button>
+            </Can>
+          ) : undefined
+        }
       />
       <PageContent>
         {query.isPending && (

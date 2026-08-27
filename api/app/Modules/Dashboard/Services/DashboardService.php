@@ -42,7 +42,7 @@ class DashboardService
             ->where('due_date', '<', $today)
             ->sortBy('due_date');
 
-        $projected = $this->cashFlow->projected(7, $costCenterId);
+        $projected = $this->cashFlow->projected(null, null, 7, $costCenterId);
         $finalProjectedBalance = $projected['series'][count($projected['series']) - 1]['projected_balance'] ?? null;
 
         return [

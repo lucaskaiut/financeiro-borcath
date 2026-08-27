@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Pencil, Plus, Repeat, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Repeat, Trash2, Copy } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -39,7 +39,7 @@ export default function RecurrencesListPage() {
 
   const query = useRecurrencesQuery({ page, per_page: PER_PAGE, search: debouncedSearch || undefined })
 
-  const canMutate = can(Permission.RECURRENCES_UPDATE) || can(Permission.RECURRENCES_DELETE)
+  const canMutate = can(Permission.RECURRENCES_UPDATE) || can(Permission.RECURRENCES_DELETE) || can(Permission.RECURRENCES_CREATE)
 
   const columns: Array<Column<Recurrence>> = [
     {
@@ -82,9 +82,14 @@ export default function RecurrencesListPage() {
           {
             key: 'actions',
             header: <span className="sr-only">Ações</span>,
-            className: 'w-24 text-right',
+            className: 'w-32 text-right',
             render: (r: Recurrence) => (
               <div className="flex items-center justify-end gap-1">
+                {can(Permission.RECURRENCES_CREATE) && (
+                  <Button variant="ghost" size="sm" onClick={() => navigate(`/recurrences/create?clone=${r.id}`)} aria-label={`Clonar ${r.description}`}>
+                    <Copy className="size-4" />
+                  </Button>
+                )}
                 {can(Permission.RECURRENCES_UPDATE) && (
                   <Button variant="ghost" size="sm" onClick={() => navigate(`/recurrences/${r.id}/edit`)} aria-label={`Editar ${r.description}`}>
                     <Pencil className="size-4" />

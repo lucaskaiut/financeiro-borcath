@@ -13,6 +13,7 @@ export interface AccountPayload {
   value: number
   due_date: string
   expected_date?: string | null
+  paid_date?: string | null
   observation?: string | null
   installments?: { quantity: number; interval?: 'daily' | 'weekly' | 'monthly' } | null
 }
@@ -68,6 +69,12 @@ export const accountsService = {
 
   async unsettle(id: string, settlementId: string): Promise<Account> {
     const response = await http.delete<ApiResponse<Account>>(`/accounts/${id}/settlements/${settlementId}`)
+
+    return response.data.data
+  },
+
+  async reopen(id: string): Promise<Account> {
+    const response = await http.post<ApiResponse<Account>>(`/accounts/${id}/reopen`)
 
     return response.data.data
   },

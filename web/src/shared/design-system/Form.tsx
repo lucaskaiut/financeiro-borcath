@@ -9,6 +9,7 @@ import {
 } from 'react-hook-form'
 import { cn } from '@/shared/utils/cn'
 import { Field } from './Field'
+import { DatePicker } from './DatePicker'
 import { Input, type InputProps } from './Input'
 import { Textarea, type TextareaProps } from './Textarea'
 import { Select, type SelectProps } from './Select'
@@ -59,10 +60,16 @@ export function TextField({
 }: BaseFieldProps & Omit<InputProps, 'name'>) {
   const { register } = useFormContext()
   const error = useFieldError(name)
+  const { type, ...inputProps } = props
+  const isDateField = type === 'date'
 
   return (
     <Field label={label} hint={hint} error={error} required={required} htmlFor={name} className={className}>
-      <Input id={name} invalid={!!error} {...register(name)} {...props} />
+      {isDateField ? (
+        <DatePicker id={name} invalid={!!error} {...register(name)} {...inputProps} />
+      ) : (
+        <Input id={name} invalid={!!error} type={type} {...register(name)} {...inputProps} />
+      )}
     </Field>
   )
 }
@@ -197,7 +204,8 @@ export function RadioGroupField({
   required,
   className,
   options,
-}: BaseFieldProps & { options: RadioOption[] }) {
+  disabled,
+}: BaseFieldProps & { options: RadioOption[]; disabled?: boolean }) {
   const { control } = useFormContext()
   const error = useFieldError(name)
 
@@ -213,6 +221,7 @@ export function RadioGroupField({
             onChange={field.onChange}
             options={options}
             aria-label={label}
+            disabled={disabled}
           />
         </Field>
       )}

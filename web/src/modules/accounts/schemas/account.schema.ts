@@ -10,6 +10,7 @@ export const accountSchema = z.object({
   value: z.string().refine((v) => v !== '' && Number(v) > 0, 'Informe um valor maior que zero'),
   due_date: z.string().min(1, 'Informe o vencimento'),
   expected_date: z.string(),
+  paid_date: z.string(),
   observation: z.string(),
   installments: z.boolean(),
   installment_quantity: z.string().refine((v) => Number(v) >= 1 && Number(v) <= 120, 'Informe entre 1 e 120'),

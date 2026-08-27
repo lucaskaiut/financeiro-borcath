@@ -3,11 +3,14 @@
 namespace App\Modules\Account\Services;
 
 use App\Modules\Account\Enums\AccountStatus;
+use App\Modules\Account\Exceptions\AccountUpdateException;
 use App\Modules\Account\Models\FinancialAccount;
 use App\Modules\Account\Models\Settlement;
 use App\Modules\User\Models\User;
 use Carbon\Carbon;
+use App\Modules\Reconciliation\Models\Reconciliation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -126,8 +129,30 @@ class AccountService
      */
     public function update(FinancialAccount $account, array $data): FinancialAccount
     {
+        $hasSettlements = $account->settlements()->exists();
+
+        $paidDateProvided = array_key_exists('paid_date', $data);
+        $paidDate = $data['paid_date'] ?? null;
+        unset($data['paid_date']);
+
+        $valueChanged = array_key_exists('value', $data);
+
+        if ($hasSettlements && array_key_exists('type', $data) && $data['type'] !== $account->type?->value) {
+            throw new AccountUpdateException('type', 'Não é possível alterar o tipo de lançamentos com baixas registradas.');
+        }
+
         $account->fill($data);
         $account->save();
+
+        if ($hasSettlements && $valueChanged) {
+            $this->syncSettlementValues($account);
+        }
+
+        if ($paidDateProvided) {
+            $this->syncSettlementDate($account, is_string($paidDate) ? $paidDate : null);
+        }
+
+        $this->recomputeStatus($account->refresh());
 
         return $account->refresh();
     }
@@ -175,6 +200,71 @@ class AccountService
         $this->recomputeStatus($account);
     }
 
+    /**
+     * Reabre a conta removendo todas as baixas e desfazendo vínculos de conciliação ativos.
+     *
+     * @return array{account: FinancialAccount, settlements_removed: int, reversed_amount: float, reconciliations_reversed: int}
+     */
+    public function reopen(FinancialAccount $account): array
+    {
+        if ($account->status === AccountStatus::Cancelled) {
+            throw new InvalidArgumentException('Contas canceladas não podem ser reabertas.');
+        }
+
+        $settlements = $account->settlements()->get();
+
+        if ($settlements->isEmpty()) {
+            throw new InvalidArgumentException('Esta conta não possui baixas para reverter.');
+        }
+
+        $reversedAmount = round((float) $settlements->sum('value'), 2);
+        $settlementsRemoved = $settlements->count();
+
+        return DB::transaction(function () use ($account, $settlements, $reversedAmount, $settlementsRemoved): array {
+            $reconciliationsReversed = 0;
+
+            $reconciliationIds = $settlements
+                ->pluck('reconciliation_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($reconciliationIds as $reconciliationId) {
+                $reconciliation = Reconciliation::query()
+                    ->with('bankTransaction')
+                    ->whereKey($reconciliationId)
+                    ->whereNull('reversed_at')
+                    ->first();
+
+                if ($reconciliation === null) {
+                    continue;
+                }
+
+                $reconciliation->reversed_at = now();
+                $reconciliation->save();
+                $reconciliationsReversed++;
+
+                $transaction = $reconciliation->bankTransaction;
+
+                if ($transaction !== null) {
+                    $transaction->status = 'pending';
+                    $transaction->save();
+                }
+            }
+
+            $account->settlements()->delete();
+            $this->markUnreconciled($account);
+            $this->recomputeStatus($account->refresh());
+
+            return [
+                'account' => $account->refresh(),
+                'settlements_removed' => $settlementsRemoved,
+                'reversed_amount' => $reversedAmount,
+                'reconciliations_reversed' => $reconciliationsReversed,
+            ];
+        });
+    }
+
     public function cancel(FinancialAccount $account): FinancialAccount
     {
         $account->status = AccountStatus::Cancelled;
@@ -198,10 +288,76 @@ class AccountService
         };
 
         $account->status = $status;
-        $account->paid_date = $status === AccountStatus::Settled
+        $account->paid_date = $settled > 0
             ? $account->settlements()->max('settled_at')
             : null;
         $account->save();
+    }
+
+    private function syncSettlementValues(FinancialAccount $account): void
+    {
+        $settlements = $account->settlements()
+            ->orderBy('settled_at')
+            ->orderBy('id')
+            ->get();
+
+        if ($settlements->isEmpty()) {
+            return;
+        }
+
+        $accountValue = round((float) $account->value, 2);
+
+        if ($settlements->count() === 1) {
+            $settlement = $settlements->first();
+            $settlement->value = $accountValue;
+            $settlement->save();
+
+            return;
+        }
+
+        $previous = $settlements->slice(0, -1);
+        $last = $settlements->last();
+
+        $sumPrevious = round((float) $previous->sum('value'), 2);
+        $newLastValue = round($accountValue - $sumPrevious, 2);
+
+        if ($newLastValue < 0) {
+            throw new AccountUpdateException(
+                'value',
+                'O valor não pode ser menor que o total já baixado nas baixas anteriores.',
+            );
+        }
+
+        $last->value = $newLastValue;
+        $last->save();
+    }
+
+    private function syncSettlementDate(FinancialAccount $account, ?string $paidDate): void
+    {
+        $settlement = $this->latestSettlement($account);
+
+        if ($settlement === null) {
+            if (filled($paidDate)) {
+                throw new AccountUpdateException('paid_date', 'Não há baixa registrada para esta conta.');
+            }
+
+            return;
+        }
+
+        if (! filled($paidDate)) {
+            throw new AccountUpdateException('paid_date', 'Informe a data da baixa.');
+        }
+
+        $settlement->settled_at = $paidDate;
+        $settlement->save();
+    }
+
+    private function latestSettlement(FinancialAccount $account): ?Settlement
+    {
+        return $account->settlements()
+            ->orderByDesc('settled_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function markReconciled(FinancialAccount $account): void

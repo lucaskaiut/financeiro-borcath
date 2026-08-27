@@ -74,6 +74,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::delete('accounts/{account}', [AccountController::class, 'destroy'])->middleware('permission:accounts.delete');
     Route::post('accounts/{account}/settle', [AccountController::class, 'settle'])->middleware('permission:accounts.settle');
     Route::delete('accounts/{account}/settlements/{settlement}', [AccountController::class, 'unsettle'])->middleware('permission:accounts.settle');
+    Route::post('accounts/{account}/reopen', [AccountController::class, 'reopen'])->middleware('permission:accounts.settle');
     Route::post('accounts/{account}/cancel', [AccountController::class, 'cancel'])->middleware('permission:accounts.update');
     Route::get('accounts/{account}/documents', [AccountController::class, 'indexDocuments'])->middleware('permission:accounts.view');
     Route::post('accounts/{account}/documents', [AccountController::class, 'storeDocuments'])->middleware('permission:accounts.update');
@@ -111,6 +112,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
     Route::get('reports/daily', [ReportController::class, 'daily'])->middleware('permission:reports.view');
     Route::get('reports/weekly', [ReportController::class, 'weekly'])->middleware('permission:reports.view');
     Route::get('reports/provision', [ReportController::class, 'provision'])->middleware('permission:reports.view');
+    Route::get('reports/provision/export', [ReportController::class, 'provisionExport'])->middleware('permission:reports.export');
     Route::get('reports/by-category', [ReportController::class, 'byCategory'])->middleware('permission:reports.view');
     Route::get('reports/by-cost-center', [ReportController::class, 'byCostCenter'])->middleware('permission:reports.view');
     Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware('permission:reports.view');

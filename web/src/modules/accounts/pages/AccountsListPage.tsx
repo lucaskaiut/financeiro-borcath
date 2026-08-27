@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Banknote, CheckCircle2, FileUp, Pencil, Plus, Trash2, Undo2, XCircle } from 'lucide-react'
+import { Banknote, CheckCircle2, Copy, FileUp, Pencil, Plus, Trash2, Undo2, XCircle } from 'lucide-react'
 import {
   Badge,
   Button,
   ButtonLink,
   ConfirmDialog,
   DataTable,
-  DateRangeShortcuts,
+  DateRangeFilter,
   EmptyState,
   Page,
   PageContent,
@@ -169,6 +169,11 @@ export default function AccountsListPage() {
       render: (a) => <span className="text-muted">{formatDate(a.due_date)}</span>,
     },
     {
+      key: 'paid_date',
+      header: 'Data da baixa',
+      render: (a) => <span className="text-muted">{formatDate(a.paid_date)}</span>,
+    },
+    {
       key: 'status',
       header: 'Status',
       render: (a) => {
@@ -179,7 +184,7 @@ export default function AccountsListPage() {
     {
       key: 'actions',
       header: <span className="sr-only">Ações</span>,
-      className: 'w-36 text-right',
+      className: 'w-44 text-right',
       render: (a: Account) => (
         <div className="flex items-center justify-end gap-1">
           {a.status === 'settled' && a.settlements?.length && can(Permission.ACCOUNTS_SETTLE) && (
@@ -188,6 +193,11 @@ export default function AccountsListPage() {
           {(a.status === 'open' || a.status === 'partial') && can(Permission.ACCOUNTS_SETTLE) && (
             <Button variant="ghost" size="sm" onClick={() => setToSettle(a)} aria-label={`Baixar ${a.description}`} className="text-success hover:bg-success-soft hover:text-success">
               <CheckCircle2 className="size-4" />
+            </Button>
+          )}
+          {can(Permission.ACCOUNTS_CREATE) && (
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/accounts/create?clone=${a.id}`)} aria-label={`Clonar ${a.description}`}>
+              <Copy className="size-4" />
             </Button>
           )}
           {can(Permission.ACCOUNTS_UPDATE) && (
@@ -302,49 +312,17 @@ export default function AccountsListPage() {
             ))}
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[13px] text-muted">Vencimento:</span>
-              <div className="flex items-center gap-2">
-                <label htmlFor="due_from" className="text-[13px] text-muted">De</label>
-                <input
-                  id="due_from"
-                  type="date"
-                  value={dueFrom}
-                  onChange={(e) => {
-                    setDueFrom(e.target.value)
-                    updateParams({ due_from: e.target.value })
-                  }}
-                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="due_to" className="text-[13px] text-muted">Até</label>
-                <input
-                  id="due_to"
-                  type="date"
-                  value={dueTo}
-                  onChange={(e) => {
-                    setDueTo(e.target.value)
-                    updateParams({ due_to: e.target.value })
-                  }}
-                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
-                />
-              </div>
-              {(dueFrom !== '' || dueTo !== '') && (
-                <button
-                  type="button"
-                  onClick={() => updateParams({ due_from: '', due_to: '' })}
-                  className="text-[13px] font-medium text-muted transition-colors hover:text-foreground"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
-            <DateRangeShortcuts
-              onApply={({ from, to }) => updateParams({ due_from: from, due_to: to })}
-            />
-          </div>
+          <DateRangeFilter
+            label="Vencimento:"
+            from={dueFrom}
+            to={dueTo}
+            showClear
+            onChange={({ from, to }) => {
+              setDueFrom(from)
+              setDueTo(to)
+              updateParams({ due_from: from, due_to: to })
+            }}
+          />
         </div>
 
         <DataTable

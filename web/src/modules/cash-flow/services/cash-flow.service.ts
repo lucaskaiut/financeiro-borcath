@@ -36,6 +36,8 @@ export interface ProjectedItem {
 }
 
 export interface ProjectedCashFlow {
+  from: string
+  to: string
   opening_balance: number
   days: number
   total_in: number

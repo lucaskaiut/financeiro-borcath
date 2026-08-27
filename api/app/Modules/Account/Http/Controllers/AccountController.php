@@ -3,6 +3,7 @@
 namespace App\Modules\Account\Http\Controllers;
 
 use App\Modules\Account\Enums\AccountStatus;
+use App\Modules\Account\Exceptions\AccountUpdateException;
 use App\Modules\Account\Http\Requests\ImportAccountsRequest;
 use App\Modules\Account\Http\Requests\SettleAccountRequest;
 use App\Modules\Account\Http\Requests\StoreAccountRequest;
@@ -23,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountController extends ApiController
@@ -117,7 +119,11 @@ class AccountController extends ApiController
             ]);
         }
 
-        $account = $this->service->update($account, $request->validated());
+        try {
+            $account = $this->service->update($account, $request->validated());
+        } catch (AccountUpdateException $e) {
+            throw ValidationException::withMessages([$e->field => [$e->getMessage()]]);
+        }
 
         $this->audit->recordEntity(
             $request->user(),
@@ -127,7 +133,7 @@ class AccountController extends ApiController
             ['description' => $account->description],
         );
 
-        return $this->success(AccountResource::make($account), 'Conta atualizada com sucesso.');
+        return $this->success(AccountResource::make($this->service->find($account->uuid)), 'Conta atualizada com sucesso.');
     }
 
     public function destroy(Request $request, FinancialAccount $account): JsonResponse
@@ -203,6 +209,50 @@ class AccountController extends ApiController
         $account = $this->service->find($account->uuid);
 
         return $this->success(AccountResource::make($account), 'Baixa removida com sucesso.');
+    }
+
+    public function reopen(Request $request, FinancialAccount $account): JsonResponse
+    {
+        $this->authorize('settle', $account);
+
+        try {
+            $result = $this->service->reopen($account);
+        } catch (InvalidArgumentException $e) {
+            throw ValidationException::withMessages(['account' => [$e->getMessage()]]);
+        }
+
+        $account = $result['account'];
+
+        $this->audit->recordEntity(
+            $request->user(),
+            AuditAction::AccountReopen,
+            'account',
+            $account->uuid,
+            [
+                'description' => $account->description,
+                'settlements_removed' => $result['settlements_removed'],
+                'reversed_amount' => $result['reversed_amount'],
+                'reconciliations_reversed' => $result['reconciliations_reversed'],
+            ],
+        );
+
+        if ($result['reconciliations_reversed'] > 0) {
+            $this->audit->recordEntity(
+                $request->user(),
+                AuditAction::ReconciliationUndo,
+                'account',
+                $account->uuid,
+                [
+                    'description' => $account->description,
+                    'source' => 'account_reopen',
+                    'reconciliations_reversed' => $result['reconciliations_reversed'],
+                ],
+            );
+        }
+
+        $account = $this->service->find($account->uuid);
+
+        return $this->success(AccountResource::make($account), 'Conta reaberta com sucesso.');
     }
 
     public function cancel(Request $request, FinancialAccount $account): JsonResponse

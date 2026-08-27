@@ -108,9 +108,67 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function provision(int $days = 30, ?string $costCenterId = null): array
+    public function provision(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null): array
     {
-        return $this->cashFlow->projected($days, $costCenterId);
+        return $this->cashFlow->projected($from, $to, $days, $costCenterId, AccountType::Payable);
+    }
+
+    public function provisionExport(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $data = $this->provision($from, $to, $days, $costCenterId);
+
+        $costCenterLabel = $costCenterId
+            ? (CostCenter::query()->where('uuid', $costCenterId)->value('name') ?? 'Centro de custo')
+            : 'Todos os centros';
+
+        $items = collect($data['accounts'])
+            ->concat($data['installments'])
+            ->concat($data['recurrences'])
+            ->sortBy('due_date')
+            ->values();
+
+        $fromLabel = Carbon::parse($data['from'])->format('d/m/Y');
+        $toLabel = Carbon::parse($data['to'])->format('d/m/Y');
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Provisão');
+
+        $sheet->setCellValue('A1', 'Relatório de provisão');
+        $sheet->setCellValue('A2', "Período: {$fromLabel} até {$toLabel}");
+        $sheet->setCellValue('B2', "Centro de custo: {$costCenterLabel}");
+
+        $sheet->fromArray(
+            ['Vencimento', 'Lançamento', 'Parcela', 'Centro de custo', 'Categoria', 'Valor'],
+            null,
+            'A4',
+        );
+
+        $row = 5;
+
+        foreach ($items as $item) {
+            $sheet->fromArray([
+                Carbon::parse($item['due_date'])->format('d/m/Y'),
+                $item['description'],
+                $item['installment'] ?? '',
+                $item['cost_center'] ?? '',
+                $item['category'] ?? '',
+                (float) $item['remaining_amount'],
+            ], null, "A{$row}");
+            $row++;
+        }
+
+        $row++;
+        $sheet->setCellValue("A{$row}", 'Total a pagar');
+        $sheet->setCellValue("F{$row}", (float) $data['total_out']);
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer): void {
+            $writer->save('php://output');
+        }, 'relatorio-provisao.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     /**
@@ -197,7 +255,7 @@ class ReportService
     public function cashFlow(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null): array
     {
         $realized = $this->cashFlow->realized($from, $to, $costCenterId, null);
-        $projected = $this->cashFlow->projected($days, $costCenterId);
+        $projected = $this->cashFlow->projected(null, null, $days, $costCenterId);
 
         return [
             'realized' => [

@@ -26,12 +26,22 @@ class ReportController extends ApiController
 
     public function provision(Request $request): JsonResponse
     {
-        $days = (int) $request->integer('days', 30);
-
         return $this->success($this->service->provision(
-            min(max($days, 1), 365),
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            (int) $request->integer('days', 30),
             $request->string('cost_center_id')->toString() ?: null,
         ));
+    }
+
+    public function provisionExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->provisionExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            (int) $request->integer('days', 30),
+            $request->string('cost_center_id')->toString() ?: null,
+        );
     }
 
     public function byCategory(Request $request): JsonResponse

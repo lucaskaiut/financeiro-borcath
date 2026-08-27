@@ -289,6 +289,8 @@ final class AssistantTools
                 'cost_center_id' => ['type' => 'string', 'description' => 'UUID opcional do centro de custo.'],
             ],
             handler: fn (array $args): array => $this->cashFlow->projected(
+                null,
+                null,
                 min(max((int) ($args['days'] ?? 30), 1), 365),
                 $args['cost_center_id'] ?? null,
             ),

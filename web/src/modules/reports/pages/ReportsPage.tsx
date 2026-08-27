@@ -7,7 +7,7 @@ import {
   CardContent,
   Checkbox,
   DataTable,
-  DateRangeShortcuts,
+  DateRangeFilter,
   EmptyState,
   Modal,
   Page,
@@ -20,6 +20,7 @@ import {
 import { Can } from '@/app/guards/PermissionGuard'
 import { Permission } from '@/shared/constants/permissions'
 import { formatCurrency, formatDate, toLocalIsoDate } from '@/shared/utils/format'
+import { addDays, toIsoDate } from '@/shared/utils/date'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import {
   useCashFlowStatement,
@@ -31,6 +32,9 @@ import {
   useWeeklyReport,
 } from '../hooks/useReports'
 import type { CashFlowStatement, CostCenterReportRow, PayableAccount } from '../services/reports.service'
+import type { ProjectedItem } from '@/modules/cash-flow/services/cash-flow.service'
+import { downloadBlob, escapeHtml, printHtmlReport } from '@/shared/utils/report-export'
+import { reportsService } from '../services/reports.service'
 
 const TABS = [
   { id: 'daily', label: 'Diário' },
@@ -45,6 +49,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 const today = toLocalIsoDate()
+const defaultProvisionTo = toIsoDate(addDays(new Date(), 30))
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<TabId>('daily')
@@ -94,11 +99,12 @@ function DailySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-        </div>
-
-        <DateRangeShortcuts variant="single" onApply={({ to }) => setDate(to)} />
+        <DateRangeFilter
+          variant="single"
+          from={date}
+          to={date}
+          onChange={({ to }) => setDate(to)}
+        />
 
         {query.isPending ? (
           <Skeleton className="h-40" />
@@ -126,14 +132,10 @@ function WeeklySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-          <span className="text-muted">até</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-        </div>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
+        <DateRangeFilter
+          from={from}
+          to={to}
+          onChange={({ from: nextFrom, to: nextTo }) => {
             setFrom(nextFrom)
             setTo(nextTo)
           }}
@@ -154,40 +156,104 @@ function WeeklySection() {
 }
 
 function ProvisionSection() {
-  const [days, setDays] = useState(30)
+  const [from, setFrom] = useState(today)
+  const [to, setTo] = useState(defaultProvisionTo)
   const [costCenterId, setCostCenterId] = useState('')
+  const [exportingXlsx, setExportingXlsx] = useState(false)
   const costCenters = useCostCenterOptions()
-  const query = useProvisionReport({ days, cost_center_id: costCenterId || undefined })
+  const query = useProvisionReport({
+    from: from || undefined,
+    to: to || undefined,
+    cost_center_id: costCenterId || undefined,
+  })
 
-  const columns: Array<Column<{ description: string; due_date: string; value: number; direction: 'in' | 'out'; installment: string | null }>> = [
+  const columns: Array<Column<{ description: string; due_date: string; remaining_amount: number; installment: string | null }>> = [
     { key: 'due_date', header: 'Vencimento', render: (i) => <span className="text-muted">{formatDate(i.due_date)}</span> },
     { key: 'description', header: 'Lançamento', render: (i) => <span className="font-medium text-foreground">{i.description}</span> },
     { key: 'installment', header: 'Parcela', render: (i) => (i.installment ? <Badge variant="neutral">{i.installment}</Badge> : <span className="text-muted">—</span>) },
     {
       key: 'value',
       header: 'Valor',
-      render: (i) => <span className={i.direction === 'in' ? 'text-success' : 'text-foreground'}>{formatCurrency(i.value)}</span>,
+      render: (i) => <span className="font-medium text-foreground">{formatCurrency(i.remaining_amount)}</span>,
     },
   ]
 
-  const items = [...(query.data?.accounts ?? []), ...(query.data?.installments ?? []), ...(query.data?.recurrences ?? [])].sort((a, b) => a.due_date.localeCompare(b.due_date))
+  const items: ProjectedItem[] = [...(query.data?.accounts ?? []), ...(query.data?.installments ?? []), ...(query.data?.recurrences ?? [])].sort((a, b) => a.due_date.localeCompare(b.due_date))
+
+  const totalOut = query.data?.total_out ?? 0
+  const periodFrom = query.data?.from ?? from
+  const periodTo = query.data?.to ?? to
+  const costCenterLabel = costCenterId
+    ? (costCenters.data?.find((option) => option.value === costCenterId)?.label ?? 'Centro de custo')
+    : 'Todos os centros'
+
+  const exportXlsx = async () => {
+    setExportingXlsx(true)
+
+    try {
+      const blob = await reportsService.provisionExport({
+        from: from || undefined,
+        to: to || undefined,
+        cost_center_id: costCenterId || undefined,
+      })
+
+      downloadBlob(blob, 'relatorio-provisao.xlsx')
+    } finally {
+      setExportingXlsx(false)
+    }
+  }
+
+  const exportPdf = () => {
+    const tableRows = items
+      .map(
+        (item) => `<tr>
+          <td>${escapeHtml(formatDate(item.due_date))}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td>${escapeHtml(item.installment ?? '—')}</td>
+          <td>${escapeHtml(item.cost_center ?? '—')}</td>
+          <td>${escapeHtml(item.category ?? '—')}</td>
+          <td class="amount">${escapeHtml(formatCurrency(item.remaining_amount))}</td>
+        </tr>`,
+      )
+      .join('')
+
+    const content = `
+      <h1>Relatório de provisão</h1>
+      <h2>Período: ${escapeHtml(formatDate(periodFrom))} até ${escapeHtml(formatDate(periodTo))} · ${escapeHtml(costCenterLabel)}</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Vencimento</th>
+            <th>Lançamento</th>
+            <th>Parcela</th>
+            <th>Centro de custo</th>
+            <th>Categoria</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+      <div class="summary">
+        <p>Total a pagar: <strong>${escapeHtml(formatCurrency(totalOut))}</strong></p>
+      </div>
+    `
+
+    printHtmlReport('Relatório de provisão', content)
+  }
 
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Select
-            aria-label="Horizonte"
-            className="w-44"
-            value={String(days)}
-            onChange={(e) => setDays(Number(e.target.value))}
-            options={[
-              { value: '30', label: '30 dias' },
-              { value: '60', label: '60 dias' },
-              { value: '90', label: '90 dias' },
-              { value: '180', label: '180 dias' },
-              { value: '365', label: '365 dias' },
-            ]}
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
           />
           <Select
             aria-label="Centro de custo"
@@ -198,7 +264,28 @@ function ProvisionSection() {
           />
         </div>
 
-        <DataTable columns={columns} rows={items} rowKey={(i) => i.id ?? i.description + i.due_date} loading={query.isPending} emptyState={<EmptyState icon={BarChart3} title="Sem provisões futuras" />} />
+        {query.isPending ? (
+          <Skeleton className="h-20 max-w-xs" />
+        ) : (
+          <Summary label="Total a pagar" value={totalOut} accent="text-danger" />
+        )}
+
+        {!query.isPending && items.length > 0 && (
+          <div className="flex justify-end gap-2">
+            <Can permission={Permission.REPORTS_EXPORT}>
+              <Button variant="secondary" onClick={exportXlsx} loading={exportingXlsx}>
+                <Download className="size-4" />
+                Exportar XLSX
+              </Button>
+              <Button variant="secondary" onClick={exportPdf}>
+                <Printer className="size-4" />
+                Exportar PDF
+              </Button>
+            </Can>
+          </div>
+        )}
+
+        <DataTable columns={columns} rows={items} rowKey={(i) => i.id ?? i.description + i.due_date} loading={query.isPending} emptyState={<EmptyState icon={BarChart3} title="Sem contas a pagar no período" />} />
       </CardContent>
     </Card>
   )
@@ -212,14 +299,10 @@ function CategorySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-          <span className="text-muted">até</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-        </div>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
+        <DateRangeFilter
+          from={from}
+          to={to}
+          onChange={({ from: nextFrom, to: nextTo }) => {
             setFrom(nextFrom)
             setTo(nextTo)
           }}
@@ -297,10 +380,16 @@ function CashFlowSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-          <span className="text-muted">até</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-2">
           <Select
             aria-label="Projeção"
             className="w-40"
@@ -327,14 +416,8 @@ function CashFlowSection() {
               </Button>
             </Can>
           )}
+          </div>
         </div>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
 
         {query.isPending ? (
           <Skeleton className="h-48" />
@@ -596,10 +679,15 @@ function PayablesSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-          <span className="text-muted">até</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
+          />
           <Select
             aria-label="Centro de custo"
             className="w-52"
@@ -608,13 +696,6 @@ function PayablesSection() {
             options={[{ value: '', label: 'Todos os centros' }, ...(costCenters.data ?? [])]}
           />
         </div>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
 
         {query.isPending ? (
           <Skeleton className="h-48" />

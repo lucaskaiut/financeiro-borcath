@@ -5,7 +5,7 @@ import {
   Card,
   CardContent,
   DataTable,
-  DateRangeShortcuts,
+  DateRangeFilter,
   EmptyState,
   FilterBar,
   Page,
@@ -83,15 +83,16 @@ export default function CashFlowRealizedPage() {
 
       <PageContent>
         <FilterBar>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <label className="text-[13px] text-muted">De</label>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[13px] text-muted">Até</label>
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground" />
-            </div>
+          <div className="flex flex-wrap gap-4">
+            <DateRangeFilter
+              from={from}
+              to={to}
+              onChange={({ from: nextFrom, to: nextTo }) => {
+                setFrom(nextFrom)
+                setTo(nextTo)
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
             <Select
               aria-label="Centro de custo"
               className="w-52"
@@ -106,15 +107,9 @@ export default function CashFlowRealizedPage() {
               onChange={(e) => setCategoryId(e.target.value)}
               options={[{ value: '', label: 'Todas as categorias' }, ...(categories.data ?? [])]}
             />
+            </div>
           </div>
         </FilterBar>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
 
         {query.isPending ? (
           <div className="grid gap-4 sm:grid-cols-3">

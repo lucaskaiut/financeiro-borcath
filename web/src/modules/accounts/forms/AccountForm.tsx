@@ -28,10 +28,11 @@ interface AccountFormProps {
   mode: 'create' | 'edit'
   defaultValues?: Partial<AccountFormValues>
   submitting: boolean
+  hasSettlement?: boolean
   onSubmit: (payload: AccountPayload, documents: File[]) => Promise<unknown>
 }
 
-export function AccountForm({ mode, defaultValues, submitting, onSubmit }: AccountFormProps) {
+export function AccountForm({ mode, defaultValues, submitting, hasSettlement = false, onSubmit }: AccountFormProps) {
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -44,6 +45,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
       value: '',
       due_date: '',
       expected_date: '',
+      paid_date: '',
       observation: '',
       installments: false,
       installment_quantity: '2',
@@ -113,6 +115,7 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
       value: Number(values.value),
       due_date: values.due_date,
       expected_date: values.expected_date || null,
+      paid_date: mode === 'edit' ? values.paid_date || null : undefined,
       observation: values.observation || null,
       installments:
         mode === 'create' && values.installments
@@ -133,9 +136,13 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
     <Card>
       <CardContent>
         <Form form={form} onSubmit={handleSubmit} className="space-y-8">
-          <Section title="Tipo de lançamento">
+          <Section
+            title="Tipo de lançamento"
+            description={hasSettlement ? 'O tipo não pode ser alterado após o registro de baixas.' : undefined}
+          >
             <RadioGroupField
               name="type"
+              disabled={hasSettlement}
               options={[
                 { value: 'payable', label: 'Conta a pagar' },
                 { value: 'receivable', label: 'Conta a receber' },
@@ -187,8 +194,25 @@ export function AccountForm({ mode, defaultValues, submitting, onSubmit }: Accou
                   }
                 }}
               />
-              <TextField name="value" label="Valor" type="number" step="0.01" min="0" required />
+              <TextField
+                name="value"
+                label="Valor"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                hint={hasSettlement ? 'Alterações refletem no fluxo de caixa realizado.' : undefined}
+              />
               <TextField name="due_date" label="Data de vencimento" type="date" required />
+              {mode === 'edit' && hasSettlement && (
+                <TextField
+                  name="paid_date"
+                  label="Data da baixa"
+                  type="date"
+                  required
+                  hint="Alterações refletem no fluxo de caixa realizado."
+                />
+              )}
               <TextField name="expected_date" label={type === 'receivable' ? 'Data prevista de recebimento' : 'Data prevista de pagamento'} type="date" />
             </div>
           </Section>

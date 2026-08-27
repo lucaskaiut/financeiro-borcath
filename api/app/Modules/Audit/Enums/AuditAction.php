@@ -14,6 +14,7 @@ enum AuditAction: string
 
     case AccountSettle = 'account.settle';
     case AccountUnsettle = 'account.unsettle';
+    case AccountReopen = 'account.reopen';
 
     case InstallmentGenerate = 'installment.generate';
     case RecurrenceGenerate = 'recurrence.generate';

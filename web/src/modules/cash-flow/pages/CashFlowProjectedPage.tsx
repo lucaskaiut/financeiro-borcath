@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   DataTable,
+  DateRangeFilter,
   EmptyState,
   FilterBar,
   Page,
@@ -14,29 +15,25 @@ import {
   Skeleton,
   type Column,
 } from '@/shared/design-system'
-import { formatCurrency, formatDate } from '@/shared/utils/format'
+import { formatCurrency, formatDate, toLocalIsoDate } from '@/shared/utils/format'
+import { addDays, toIsoDate } from '@/shared/utils/date'
 import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import { useProjectedCashFlow } from '../hooks/useCashFlow'
 import type { ProjectedItem } from '../services/cash-flow.service'
 
-const DAYS_OPTIONS = [
-  { value: '7', label: '7 dias' },
-  { value: '15', label: '15 dias' },
-  { value: '30', label: '30 dias' },
-  { value: '60', label: '60 dias' },
-  { value: '90', label: '90 dias' },
-  { value: '180', label: '180 dias' },
-  { value: '365', label: '365 dias' },
-]
+const today = toLocalIsoDate()
+const defaultTo = toIsoDate(addDays(new Date(), 30))
 
 export default function CashFlowProjectedPage() {
-  const [days, setDays] = useState(30)
+  const [from, setFrom] = useState(today)
+  const [to, setTo] = useState(defaultTo)
   const [costCenterId, setCostCenterId] = useState('')
 
   const costCenters = useCostCenterOptions()
 
   const query = useProjectedCashFlow({
-    days,
+    from,
+    to,
     ...(costCenterId ? { cost_center_id: costCenterId } : {}),
   })
 
@@ -82,13 +79,14 @@ export default function CashFlowProjectedPage() {
 
       <PageContent>
         <FilterBar>
-          <div className="flex flex-wrap gap-2">
-            <Select
-              aria-label="Horizonte de projeção"
-              className="w-44"
-              value={String(days)}
-              onChange={(e) => setDays(Number(e.target.value))}
-              options={DAYS_OPTIONS}
+          <div className="flex flex-wrap gap-4">
+            <DateRangeFilter
+              from={from}
+              to={to}
+              onChange={({ from: nextFrom, to: nextTo }) => {
+                setFrom(nextFrom)
+                setTo(nextTo)
+              }}
             />
             <Select
               aria-label="Centro de custo"

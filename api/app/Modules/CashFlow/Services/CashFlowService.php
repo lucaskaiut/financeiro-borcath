@@ -79,18 +79,36 @@ class CashFlowService
     /**
      * @return array<string, mixed>
      */
-    public function projected(int $days = 30, ?string $costCenterId = null): array
+    public function projected(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null, ?AccountType $accountType = null): array
     {
-        $from = now()->startOfDay();
-        $to = now()->addDays($days)->endOfDay();
+        if ($from !== null || $to !== null) {
+            $fromDate = $from ? Carbon::parse($from)->startOfDay() : now()->startOfDay();
+            $toDate = $to ? Carbon::parse($to)->endOfDay() : now()->addDays(min(max($days, 1), 365))->endOfDay();
+        } else {
+            $days = min(max($days, 1), 365);
+            $fromDate = now()->startOfDay();
+            $toDate = now()->addDays($days)->endOfDay();
+        }
+
+        if ($fromDate->gt($toDate)) {
+            [$fromDate, $toDate] = [$toDate->copy()->startOfDay(), $fromDate->copy()->endOfDay()];
+        }
+
+        $periodDays = (int) $fromDate->copy()->startOfDay()->diffInDays($toDate->copy()->startOfDay());
+
+        if ($periodDays > 365) {
+            $toDate = $fromDate->copy()->addDays(365)->endOfDay();
+            $periodDays = 365;
+        }
 
         $base = fn () => FinancialAccount::query()
             ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,type'])
             ->withSum('settlements', 'value')
             ->whereIn('status', ['open', 'partial'])
-            ->whereDate('due_date', '>=', $from->toDateString())
-            ->whereDate('due_date', '<=', $to->toDateString())
-            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId));
+            ->whereDate('due_date', '>=', $fromDate->toDateString())
+            ->whereDate('due_date', '<=', $toDate->toDateString())
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->when($accountType, fn ($q) => $q->where('type', $accountType));
 
         $futureAccounts = $base()->whereNull('recurrence_id')->whereNull('transfer_id')->whereNull('installment_group_id')->get();
         $installments = $base()->whereNotNull('installment_group_id')->get();
@@ -108,8 +126,8 @@ class CashFlowService
         $balance = $this->currentBalance($costCenterId);
         $series = [];
 
-        for ($i = 0; $i <= $days; $i++) {
-            $date = now()->addDays($i)->toDateString();
+        for ($i = 0; $i <= $periodDays; $i++) {
+            $date = $fromDate->copy()->addDays($i)->toDateString();
             $movement = $grouped->get($date, ['in' => 0.0, 'out' => 0.0]);
             $balance = round($balance + $movement['in'] - $movement['out'], 2);
 
@@ -122,8 +140,10 @@ class CashFlowService
         }
 
         return [
+            'from' => $fromDate->toDateString(),
+            'to' => $toDate->toDateString(),
             'opening_balance' => $this->currentBalance($costCenterId),
-            'days' => $days,
+            'days' => $periodDays,
             'total_in' => round($all->where('type', AccountType::Receivable)->sum('remaining_amount'), 2),
             'total_out' => round($all->where('type', AccountType::Payable)->sum('remaining_amount'), 2),
             'series' => $series,

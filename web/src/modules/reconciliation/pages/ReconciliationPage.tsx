@@ -7,7 +7,7 @@ import {
   Card,
   CardContent,
   DataTable,
-  DateRangeShortcuts,
+  DateRangeFilter,
   EmptyState,
   Page,
   PageContent,
@@ -161,23 +161,14 @@ export default function ReconciliationPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-[13px] font-medium text-foreground">Período (vencimento)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  aria-label="De"
-                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
-                />
-                <span className="text-sm text-muted">até</span>
-                <input
-                  type="date"
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  aria-label="Até"
-                  className="h-10 rounded-lg bg-surface-2 px-3 text-sm text-foreground"
-                />
-              </div>
+              <DateRangeFilter
+                from={from}
+                to={to}
+                onChange={({ from: nextFrom, to: nextTo }) => {
+                  setFrom(nextFrom)
+                  setTo(nextTo)
+                }}
+              />
             </div>
             <Can permission={Permission.RECONCILIATION_EXECUTE}>
               <Button onClick={() => autoReconcile.mutate({ from: from || undefined, to: to || undefined })} loading={autoReconcile.isPending} variant="secondary">
@@ -187,14 +178,6 @@ export default function ReconciliationPage() {
             </Can>
           </CardContent>
         </Card>
-
-        <DateRangeShortcuts
-          onApply={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
-
         <DataTable
           caption="Transações do extrato"
           columns={columns}

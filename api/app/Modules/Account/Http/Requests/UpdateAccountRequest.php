@@ -46,6 +46,7 @@ class UpdateAccountRequest extends FormRequest
             'value' => ['sometimes', 'required', 'numeric', 'gt:0'],
             'due_date' => ['sometimes', 'required', 'date'],
             'expected_date' => ['nullable', 'date'],
+            'paid_date' => ['nullable', 'date'],
             'observation' => ['nullable', 'string'],
         ];
     }
@@ -54,6 +55,10 @@ class UpdateAccountRequest extends FormRequest
     {
         if ($this->filled('value')) {
             $this->merge(['value' => (float) $this->input('value')]);
+        }
+
+        if ($this->exists('paid_date') && $this->input('paid_date') === '') {
+            $this->merge(['paid_date' => null]);
         }
 
         $this->fillCategoryFromSubcategory();

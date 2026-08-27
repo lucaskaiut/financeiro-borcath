@@ -24,6 +24,7 @@ function invalidateAccounts(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all })
   queryClient.invalidateQueries({ queryKey: ['cash-flow'] })
   queryClient.invalidateQueries({ queryKey: ['reports'] })
+  queryClient.invalidateQueries({ queryKey: ['reconciliation'] })
 }
 
 export function useCreateAccount() {
@@ -96,6 +97,19 @@ export function useUnsettleAccount(id: string) {
     onSuccess: () => {
       invalidateAccounts(queryClient)
       toast.success('Baixa removida', 'A baixa foi removida.')
+    },
+  })
+}
+
+export function useReopenAccount(id: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => accountsService.reopen(id),
+    onSuccess: () => {
+      invalidateAccounts(queryClient)
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.detail(id) })
+      toast.success('Conta reaberta', 'Todas as baixas foram revertidas e a conta voltou ao status em aberto.')
     },
   })
 }

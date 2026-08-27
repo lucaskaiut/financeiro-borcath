@@ -76,9 +76,18 @@ export const reportsService = {
     return response.data.data
   },
 
-  async provision(params: { days?: number; cost_center_id?: string }): Promise<import('@/modules/cash-flow/services/cash-flow.service').ProjectedCashFlow> {
+  async provision(params: { from?: string; to?: string; days?: number; cost_center_id?: string }): Promise<import('@/modules/cash-flow/services/cash-flow.service').ProjectedCashFlow> {
     const response = await http.get<ApiResponse<import('@/modules/cash-flow/services/cash-flow.service').ProjectedCashFlow>>('/reports/provision', { params })
     return response.data.data
+  },
+
+  async provisionExport(params: { from?: string; to?: string; days?: number; cost_center_id?: string }): Promise<Blob> {
+    const response = await http.get<Blob>('/reports/provision/export', {
+      params,
+      responseType: 'blob',
+    })
+
+    return response.data
   },
 
   async byCategory(params: { from?: string; to?: string }): Promise<CategoryReport> {
