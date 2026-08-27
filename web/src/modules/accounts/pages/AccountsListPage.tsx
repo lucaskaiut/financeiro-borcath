@@ -190,7 +190,7 @@ export default function AccountsListPage() {
               <CheckCircle2 className="size-4" />
             </Button>
           )}
-          {can(Permission.ACCOUNTS_UPDATE) && (a.status === 'open' || a.status === 'partial') && (
+          {can(Permission.ACCOUNTS_UPDATE) && (
             <Button variant="ghost" size="sm" onClick={() => navigate(`/accounts/${a.id}/edit`)} aria-label={`Editar ${a.description}`}>
               <Pencil className="size-4" />
             </Button>
