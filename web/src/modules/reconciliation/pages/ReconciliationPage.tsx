@@ -42,7 +42,6 @@ const STATUS_BADGES: Record<BankTransaction['status'], { variant: 'neutral' | 'p
 export default function ReconciliationPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Number(searchParams.get('page') ?? 1)
-  const status = searchParams.get('status') ?? ''
 
   const { can } = usePermissions()
 
@@ -59,7 +58,7 @@ export default function ReconciliationPage() {
   const [matching, setMatching] = useState<BankTransaction | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const query = useReconciliationQuery({ page, per_page: PER_PAGE, status: status || undefined })
+  const query = useReconciliationQuery({ page, per_page: PER_PAGE, status: 'pending' })
 
   const handleFile = async (file: File | null) => {
     if (!file) return
@@ -77,16 +76,6 @@ export default function ReconciliationPage() {
       key: 'date',
       header: 'Data',
       render: (t) => <span className="text-muted">{formatDate(t.date)}</span>,
-    },
-    {
-      key: 'description',
-      header: 'Descrição',
-      render: (t) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-foreground">{t.description ?? '—'}</p>
-          <p className="truncate text-[13px] text-muted">{t.cost_center ?? '—'}</p>
-        </div>
-      ),
     },
     {
       key: 'value',
@@ -205,21 +194,6 @@ export default function ReconciliationPage() {
             setTo(nextTo)
           }}
         />
-
-        <div className="flex gap-2">
-          <Select
-            aria-label="Filtrar por status"
-            className="w-48"
-            value={status}
-            onChange={(e) => setSearchParams((p) => { e.target.value ? p.set('status', e.target.value) : p.delete('status'); p.delete('page'); return p }, { replace: true })}
-            options={[
-              { value: '', label: 'Todos os status' },
-              { value: 'pending', label: 'Pendentes' },
-              { value: 'matched', label: 'Conciliadas' },
-              { value: 'ignored', label: 'Ignoradas' },
-            ]}
-          />
-        </div>
 
         <DataTable
           caption="Transações do extrato"
