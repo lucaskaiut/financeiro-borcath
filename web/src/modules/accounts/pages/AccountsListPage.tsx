@@ -200,8 +200,8 @@ export default function AccountsListPage() {
     },
     {
       key: 'actions',
-      header: <span className="sr-only">Ações</span>,
-      className: 'w-44 text-right',
+      header: 'Ações',
+      className: 'w-44 text-center',
       render: (a: Account) => (
         <div className="flex items-center justify-end gap-1">
           {a.status === 'settled' && a.settlements?.length && can(Permission.ACCOUNTS_SETTLE) && (
