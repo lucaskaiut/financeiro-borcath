@@ -58,7 +58,7 @@ export function TextField({
   className,
   ...props
 }: BaseFieldProps & Omit<InputProps, 'name'>) {
-  const { register } = useFormContext()
+  const { register, control } = useFormContext()
   const error = useFieldError(name)
   const { type, ...inputProps } = props
   const isDateField = type === 'date'
@@ -66,7 +66,22 @@ export function TextField({
   return (
     <Field label={label} hint={hint} error={error} required={required} htmlFor={name} className={className}>
       {isDateField ? (
-        <DatePicker id={name} invalid={!!error} {...register(name)} {...inputProps} />
+        <Controller
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <DatePicker
+              id={name}
+              invalid={!!error}
+              value={(field.value as string) ?? ''}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              name={field.name}
+              ref={field.ref}
+              {...inputProps}
+            />
+          )}
+        />
       ) : (
         <Input id={name} invalid={!!error} type={type} {...register(name)} {...inputProps} />
       )}
