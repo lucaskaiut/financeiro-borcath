@@ -5,6 +5,8 @@ import {
   Badge,
   Button,
   ButtonLink,
+  Card,
+  CardContent,
   ConfirmDialog,
   DataTable,
   DateRangeFilter,
@@ -63,6 +65,8 @@ export default function AccountsListPage() {
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
   const [dueFrom, setDueFrom] = useState(searchParams.get('due_from') ?? '')
   const [dueTo, setDueTo] = useState(searchParams.get('due_to') ?? '')
+  const [paidFrom, setPaidFrom] = useState(searchParams.get('paid_from') ?? '')
+  const [paidTo, setPaidTo] = useState(searchParams.get('paid_to') ?? '')
   const debouncedSearch = useDebounce(search)
   const page = Number(searchParams.get('page') ?? 1)
   const type = searchParams.get('type') ?? ''
@@ -72,6 +76,8 @@ export default function AccountsListPage() {
   useEffect(() => {
     setDueFrom(searchParams.get('due_from') ?? '')
     setDueTo(searchParams.get('due_to') ?? '')
+    setPaidFrom(searchParams.get('paid_from') ?? '')
+    setPaidTo(searchParams.get('paid_to') ?? '')
   }, [searchParams])
 
   const navigate = useNavigate()
@@ -96,9 +102,11 @@ export default function AccountsListPage() {
     cost_center_id: costCenterId || undefined,
     due_from: dueFrom || undefined,
     due_to: dueTo || undefined,
+    paid_from: paidFrom || undefined,
+    paid_to: paidTo || undefined,
   })
 
-  const updateParams = (next: { page?: number; search?: string; type?: string; status?: string; cost_center_id?: string; due_from?: string; due_to?: string }) => {
+  const updateParams = (next: { page?: number; search?: string; type?: string; status?: string; cost_center_id?: string; due_from?: string; due_to?: string; paid_from?: string; paid_to?: string }) => {
     setSearchParams((params) => {
       if (next.type !== undefined) {
         next.type ? params.set('type', next.type) : params.delete('type')
@@ -118,6 +126,14 @@ export default function AccountsListPage() {
       }
       if (next.due_to !== undefined) {
         next.due_to ? params.set('due_to', next.due_to) : params.delete('due_to')
+        params.delete('page')
+      }
+      if (next.paid_from !== undefined) {
+        next.paid_from ? params.set('paid_from', next.paid_from) : params.delete('paid_from')
+        params.delete('page')
+      }
+      if (next.paid_to !== undefined) {
+        next.paid_to ? params.set('paid_to', next.paid_to) : params.delete('paid_to')
         params.delete('page')
       }
       if (next.search !== undefined) {
@@ -312,17 +328,39 @@ export default function AccountsListPage() {
             ))}
           </div>
 
-          <DateRangeFilter
-            label="Vencimento:"
-            from={dueFrom}
-            to={dueTo}
-            showClear
-            onChange={({ from, to }) => {
-              setDueFrom(from)
-              setDueTo(to)
-              updateParams({ due_from: from, due_to: to })
-            }}
-          />
+          <div className="flex flex-col gap-3 lg:flex-row">
+            <Card className="flex-1">
+              <CardContent>
+                <DateRangeFilter
+                  label="Vencimento:"
+                  from={dueFrom}
+                  to={dueTo}
+                  showClear
+                  onChange={({ from, to }) => {
+                    setDueFrom(from)
+                    setDueTo(to)
+                    updateParams({ due_from: from, due_to: to })
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="flex-1">
+              <CardContent>
+                <DateRangeFilter
+                  label="Data da baixa:"
+                  from={paidFrom}
+                  to={paidTo}
+                  showClear
+                  onChange={({ from, to }) => {
+                    setPaidFrom(from)
+                    setPaidTo(to)
+                    updateParams({ paid_from: from, paid_to: to })
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <DataTable

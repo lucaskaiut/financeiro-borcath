@@ -164,6 +164,46 @@ class FinanceTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_accounts_can_be_filtered_by_paid_date(): void
+    {
+        $tenant = $this->createTenantWithRoles();
+        Sanctum::actingAs($this->createAdmin($tenant));
+
+        $costCenterId = $this->createCostCenter();
+        $categoryId = $this->createCategory('expense');
+
+        $accountA = $this->postJson('/api/accounts', [
+            'type' => 'payable',
+            'description' => 'Conta A',
+            'cost_center_id' => $costCenterId,
+            'category_id' => $categoryId,
+            'value' => 100,
+            'due_date' => '2026-03-01',
+        ])->json('data.0.id');
+
+        $accountB = $this->postJson('/api/accounts', [
+            'type' => 'payable',
+            'description' => 'Conta B',
+            'cost_center_id' => $costCenterId,
+            'category_id' => $categoryId,
+            'value' => 200,
+            'due_date' => '2026-03-01',
+        ])->json('data.0.id');
+
+        $this->postJson("/api/accounts/{$accountA}/settle", ['value' => 100, 'settled_at' => '2026-03-05'])->assertOk();
+        $this->postJson("/api/accounts/{$accountB}/settle", ['value' => 200, 'settled_at' => '2026-03-20'])->assertOk();
+
+        $this->getJson('/api/accounts?paid_from=2026-03-01&paid_to=2026-03-10')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $accountA);
+
+        $this->getJson('/api/accounts?paid_from=2026-03-15')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $accountB);
+    }
+
     public function test_settled_account_value_syncs_to_settlement_and_cash_flow(): void
     {
         $tenant = $this->createTenantWithRoles();

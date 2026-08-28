@@ -48,6 +48,8 @@ class AccountController extends ApiController
                 'category_id',
                 'due_from',
                 'due_to',
+                'paid_from',
+                'paid_to',
                 'installment_group_id',
             ]),
         );

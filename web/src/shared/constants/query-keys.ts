@@ -90,4 +90,6 @@ export interface AccountListParams extends ListParams {
   category_id?: string
   due_from?: string
   due_to?: string
+  paid_from?: string
+  paid_to?: string
 }

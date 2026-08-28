@@ -17,7 +17,7 @@ use InvalidArgumentException;
 class AccountService
 {
     /**
-     * @param  array{per_page?: int, search?: ?string, type?: ?string, status?: ?string, cost_center_id?: ?string, category_id?: ?string, due_from?: ?string, due_to?: ?string, installment_group_id?: ?string}  $filters
+     * @param  array{per_page?: int, search?: ?string, type?: ?string, status?: ?string, cost_center_id?: ?string, category_id?: ?string, due_from?: ?string, due_to?: ?string, paid_from?: ?string, paid_to?: ?string, installment_group_id?: ?string}  $filters
      */
     public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
@@ -32,6 +32,8 @@ class AccountService
         $query->when(filled($filters['installment_group_id'] ?? null), fn ($q) => $q->where('installment_group_id', $filters['installment_group_id']));
         $query->when(filled($filters['due_from'] ?? null), fn ($q) => $q->whereDate('due_date', '>=', $filters['due_from']));
         $query->when(filled($filters['due_to'] ?? null), fn ($q) => $q->whereDate('due_date', '<=', $filters['due_to']));
+        $query->when(filled($filters['paid_from'] ?? null), fn ($q) => $q->whereDate('paid_date', '>=', $filters['paid_from']));
+        $query->when(filled($filters['paid_to'] ?? null), fn ($q) => $q->whereDate('paid_date', '<=', $filters['paid_to']));
 
         $query->when(filled($filters['search'] ?? null), function ($q) use ($filters): void {
             $search = $filters['search'];
