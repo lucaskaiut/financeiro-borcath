@@ -168,8 +168,9 @@ export default function AccountsListPage() {
     {
       key: 'value',
       header: 'Valor',
+      className: 'text-center',
       render: (a) => (
-        <div className="text-right">
+        <div className="inline-flex flex-col items-end text-right">
           <p className={`font-medium ${a.type === 'receivable' ? 'text-success' : 'text-foreground'}`}>
             {formatCurrency(a.value)}
           </p>
