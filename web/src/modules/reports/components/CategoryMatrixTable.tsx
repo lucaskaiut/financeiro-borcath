@@ -1,6 +1,6 @@
 import { cn } from '@/shared/utils/cn'
 import type { CategoryMatrix, CategoryMatrixTotals } from '../services/reports.service'
-import { categoryTotalAmountClass, formatCategoryAmount } from '../utils/category-format'
+import { categoryAmountClass, categoryTotalAmountClass, categoryTotalColumnAmountClass, formatCategoryAmount } from '../utils/category-format'
 
 interface CategoryMatrixTableProps {
   matrix: CategoryMatrix
@@ -60,25 +60,26 @@ function AmountCells({
   totals,
   matrix,
   cellClass,
-  valueClass,
+  highlightAllValues = false,
 }: {
   totals: CategoryMatrixTotals
   matrix: CategoryMatrix
   cellClass: string
-  valueClass: (value: number | null | undefined) => string
+  highlightAllValues?: boolean
 }) {
   return (
     <>
       {matrix.columns.map((column) => {
         const value = totals.amounts[column.key]
+        const valueClass = highlightAllValues ? categoryTotalAmountClass(value) : categoryAmountClass(value)
 
         return (
-          <td key={column.key} className={cn('whitespace-nowrap text-right tabular-nums', cellClass, valueClass(value))}>
+          <td key={column.key} className={cn('whitespace-nowrap text-right tabular-nums', cellClass, valueClass)}>
             {formatCategoryAmount(value)}
           </td>
         )
       })}
-      <td className={cn('whitespace-nowrap text-right tabular-nums', cellClass, valueClass(totals.total))}>
+      <td className={cn('whitespace-nowrap text-right tabular-nums', cellClass, highlightAllValues ? categoryTotalAmountClass(totals.total) : categoryTotalColumnAmountClass(totals.total))}>
         {formatCategoryAmount(totals.total)}
       </td>
     </>
@@ -115,7 +116,7 @@ function CostCenterRows({
         <td className={cn('sticky left-0 z-10 bg-blue-200/95 text-foreground dark:bg-blue-900/90', labelColumnClass, cellClass)}>
           {group.cost_center} - Totais
         </td>
-        <AmountCells totals={group.subtotal} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
+        <AmountCells totals={group.subtotal} matrix={matrix} cellClass={cellClass} />
       </tr>
     </>
   )
@@ -136,7 +137,7 @@ function CategoryRows({
         <td className={cn('sticky left-0 z-10 bg-blue-100/95 text-foreground dark:bg-blue-950/90', labelColumnClass, cellClass)}>
           {category.category} - Totais
         </td>
-        <AmountCells totals={category.subtotal} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
+        <AmountCells totals={category.subtotal} matrix={matrix} cellClass={cellClass} />
       </tr>
 
       {category.subcategories.map((subcategory) => (
@@ -161,7 +162,7 @@ function SubcategoryRows({
         <td className={cn('sticky left-0 z-10 bg-blue-50/95 pl-6 text-foreground dark:bg-blue-950/80', labelColumnClass, cellClass)}>
           {subcategory.subcategory} - Totais
         </td>
-        <AmountCells totals={subcategory.subtotal} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
+        <AmountCells totals={subcategory.subtotal} matrix={matrix} cellClass={cellClass} />
       </tr>
     </>
   )
@@ -181,7 +182,7 @@ function GrandTotalRow({
       <td className={cn('sticky left-0 z-10 bg-blue-200 text-foreground dark:bg-blue-900/90', labelColumnClass, cellClass)}>
         Total geral
       </td>
-      <AmountCells totals={matrix.grand_total} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
+      <AmountCells totals={matrix.grand_total} matrix={matrix} cellClass={cellClass} highlightAllValues />
     </tr>
   )
 }

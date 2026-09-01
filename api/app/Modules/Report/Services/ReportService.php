@@ -1673,6 +1673,20 @@ class ReportService
             $this->applyXlsxDataArea($sheet, $dataStartRow, $grandRow - 1, $columnCount, 1, false);
             $this->applyXlsxColumnWidths($sheet, $columnCount, 40, 14);
             $sheet->freezePane('A'.($headerRow + 1));
+
+            $lastColumn = $this->xlsxColumnLetter($columnCount);
+
+            if ($grandRow > $dataStartRow) {
+                $sheet->getStyle("{$lastColumn}{$dataStartRow}:{$lastColumn}".($grandRow - 1))
+                    ->getFont()
+                    ->getColor()
+                    ->setARGB('FFDC2626');
+            }
+
+            $sheet->getStyle("B{$grandRow}:{$lastColumn}{$grandRow}")
+                ->getFont()
+                ->getColor()
+                ->setARGB('FFDC2626');
         });
     }
 

@@ -6,21 +6,36 @@ function cell(value: number | null | undefined): string {
   return formatCategoryAmount(value)
 }
 
-function amountCells(totals: CategoryMatrixTotals, matrix: CategoryMatrix): string {
+function amountCells(totals: CategoryMatrixTotals, matrix: CategoryMatrix, highlightAllValues = false): string {
+  const periodStyle = 'padding:6px;text-align:right;border-bottom:1px solid #e5e7eb;color:#111827;'
+  const totalColumnStyle = 'padding:6px;text-align:right;border-bottom:1px solid #e5e7eb;color:#dc2626;font-weight:600;'
+  const grandTotalStyle = 'padding:6px;text-align:right;border-bottom:1px solid #e5e7eb;color:#dc2626;font-weight:700;'
+
   const values = [
-    ...matrix.columns.map((column) => cell(totals.amounts[column.key])),
-    cell(totals.total),
+    ...matrix.columns.map((column) => ({
+      value: cell(totals.amounts[column.key]),
+      style: highlightAllValues ? grandTotalStyle : periodStyle,
+    })),
+    {
+      value: cell(totals.total),
+      style: highlightAllValues ? grandTotalStyle : totalColumnStyle,
+    },
   ]
 
-  return values
-    .map((value) => `<td style="padding:6px;text-align:right;border-bottom:1px solid #e5e7eb;">${value}</td>`)
-    .join('')
+  return values.map(({ value, style }) => `<td style="${style}">${value}</td>`).join('')
 }
 
-function totalRow(label: string, totals: CategoryMatrixTotals, matrix: CategoryMatrix, style: string, paddingLeft = '6px'): string {
+function totalRow(
+  label: string,
+  totals: CategoryMatrixTotals,
+  matrix: CategoryMatrix,
+  style: string,
+  paddingLeft = '6px',
+  highlightAllValues = false,
+): string {
   return `<tr style="${style}">
     <td style="padding:6px;padding-left:${paddingLeft};text-align:left;border-bottom:1px solid #93c5fd;">${label}</td>
-    ${amountCells(totals, matrix)}
+    ${amountCells(totals, matrix, highlightAllValues)}
   </tr>`
 }
 
@@ -56,7 +71,7 @@ export function buildCategoryMatrixHtml(
   }
 
   sections.push(
-    totalRow('Total geral', matrix.grand_total, matrix, 'font-weight:700;background:#93c5fd;border-top:2px solid #60a5fa;'),
+    totalRow('Total geral', matrix.grand_total, matrix, 'font-weight:700;background:#93c5fd;border-top:2px solid #60a5fa;', '6px', true),
   )
 
   return `<!DOCTYPE html>
