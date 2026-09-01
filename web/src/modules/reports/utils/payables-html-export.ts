@@ -1,5 +1,6 @@
 import { formatCurrency, formatShortDate } from '@/shared/utils/format'
 import type { PayableAccount, PayablesExportReport, PayablesReport } from '../services/reports.service'
+import { isPayablesReportOverdue } from './payables-report'
 
 const NO_COST_CENTER = 'Sem centro de custo'
 
@@ -26,7 +27,7 @@ export function buildPayablesExportReport(data: PayablesReport, selectedIds: Set
 
     const group = groupsMap.get(key)!
 
-    if (account.is_overdue && !selectedIds.has(account.id)) {
+    if (isPayablesReportOverdue(account, selectedIds)) {
       group.overdue.accounts.push(account)
       group.overdue.total += account.remaining_amount
       group.total_overdue += account.remaining_amount

@@ -197,16 +197,19 @@ class ReportService
 
             $columnCount = count($columnLabels) + 2;
             $headers = array_merge(['Conta'], $columnLabels, ['Total']);
-            $sheet->fromArray($headers, null, "A{$headerRow}");
-            $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount);
-
             $row = $headerRow + 1;
-            $dataStartRow = $row;
 
             foreach ($data['groups'] as $group) {
                 $sheet->setCellValue("A{$row}", $group['cost_center']);
                 $this->applyXlsxSectionBanner($sheet, $row, $columnCount);
                 $row++;
+
+                $groupHeaderRow = $row;
+                $sheet->fromArray($headers, null, "A{$row}");
+                $this->applyXlsxColumnHeader($sheet, $groupHeaderRow, $columnCount, 'FFF3F4F6');
+                $row++;
+
+                $dataStartRow = $row;
 
                 foreach ($group['rows'] as $accountRow) {
                     $cells = [$accountRow['description']];
@@ -229,8 +232,18 @@ class ReportService
                 $subtotalCells[] = $this->xlsxMoney($group['subtotal']['total']);
                 $sheet->fromArray($subtotalCells, null, "A{$row}");
                 $this->applyXlsxSubtotalRow($sheet, $row, $columnCount);
+                $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 1, false);
                 $row += 2;
             }
+
+            $sheet->setCellValue("A{$row}", 'TOTAL GERAL');
+            $this->applyXlsxSectionBanner($sheet, $row, $columnCount);
+            $row++;
+
+            $grandHeaderRow = $row;
+            $sheet->fromArray($headers, null, "A{$row}");
+            $this->applyXlsxColumnHeader($sheet, $grandHeaderRow, $columnCount, 'FFF3F4F6');
+            $row++;
 
             $grandCells = ['Total geral'];
 
@@ -243,9 +256,7 @@ class ReportService
             $sheet->fromArray($grandCells, null, "A{$row}");
             $this->applyXlsxTotalRow($sheet, $grandRow, $columnCount, true);
 
-            $this->applyXlsxDataArea($sheet, $dataStartRow, $grandRow - 1, $columnCount, 1, false);
             $this->applyXlsxColumnWidths($sheet, $columnCount, 36, 14);
-            $sheet->freezePane('A'.($headerRow + 1));
         });
     }
 
@@ -978,7 +989,7 @@ class ReportService
 
             $totalOpen += $remaining;
 
-            if ($isOverdue) {
+            if ($isOverdue || $isDueToday) {
                 $totalOverdue += $remaining;
             }
         }
@@ -1145,6 +1156,14 @@ class ReportService
     }
 
     /**
+     * @param  array<string, mixed>  $account
+     */
+    private function isPayablesReportOverdue(array $account, bool $selected): bool
+    {
+        return ! $selected && (($account['is_overdue'] ?? false) || ($account['is_due_today'] ?? false));
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $accounts
      * @return list<array<string, mixed>>
      */
@@ -1168,7 +1187,7 @@ class ReportService
             $groupsMap[$costCenter]['accounts'][] = $account;
             $groupsMap[$costCenter]['total_open'] += (float) $account['remaining_amount'];
 
-            if ($account['is_overdue']) {
+            if (($account['is_overdue'] ?? false) || ($account['is_due_today'] ?? false)) {
                 $groupsMap[$costCenter]['total_overdue'] += (float) $account['remaining_amount'];
             }
         }
@@ -1216,7 +1235,7 @@ class ReportService
                 ];
             }
 
-            if ($account['is_overdue'] && ! isset($selectedSet[$account['id']])) {
+            if ($this->isPayablesReportOverdue($account, isset($selectedSet[$account['id']]))) {
                 $groupsMap[$costCenter]['overdue']['accounts'][] = $account;
                 $groupsMap[$costCenter]['overdue']['total'] += (float) $account['remaining_amount'];
                 $groupsMap[$costCenter]['total_overdue'] += (float) $account['remaining_amount'];
@@ -1611,19 +1630,6 @@ class ReportService
                     $this->applyXlsxSubtotalRow($sheet, $row, $columnCount);
                     $row++;
 
-                    foreach ($category['direct_rows'] as $detailRow) {
-                        $sheet->setCellValue("A{$row}", '    '.$detailRow['label']);
-                        $cells = [];
-
-                        foreach ($columnKeys as $key) {
-                            $cells[] = $this->xlsxMoney($detailRow['amounts'][$key] ?? null);
-                        }
-
-                        $cells[] = $this->xlsxMoney($detailRow['total']);
-                        $sheet->fromArray($cells, null, "B{$row}");
-                        $row++;
-                    }
-
                     foreach ($category['subcategories'] as $subcategory) {
                         $sheet->setCellValue("A{$row}", '    '.$subcategory['subcategory'].' - Totais');
                         $subtotalCells = [];
@@ -1636,19 +1642,6 @@ class ReportService
                         $sheet->fromArray($subtotalCells, null, "B{$row}");
                         $this->applyXlsxSubtotalRow($sheet, $row, $columnCount, 'FFEFF6FF');
                         $row++;
-
-                        foreach ($subcategory['rows'] as $detailRow) {
-                            $sheet->setCellValue("A{$row}", '        '.$detailRow['label']);
-                            $cells = [];
-
-                            foreach ($columnKeys as $key) {
-                                $cells[] = $this->xlsxMoney($detailRow['amounts'][$key] ?? null);
-                            }
-
-                            $cells[] = $this->xlsxMoney($detailRow['total']);
-                            $sheet->fromArray($cells, null, "B{$row}");
-                            $row++;
-                        }
                     }
                 }
 

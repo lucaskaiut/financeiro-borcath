@@ -10,6 +10,7 @@ import { ReportGroupHeader } from '../components/ReportGroupHeader'
 import { ProvisionMatrixTable } from '../components/ProvisionMatrixTable'
 import { ProvisionMatrixViewer, ProvisionViewButton } from '../components/ProvisionMatrixViewer'
 import { buildPayablesExportReport, buildPayablesReportHtml } from '../utils/payables-html-export'
+import { isPayablesReportOverdue } from '../utils/payables-report'
 import { PayablesReportViewer, PayablesViewButton } from '../components/PayablesReportViewer'
 import { buildProvisionMatrixHtml } from '../utils/provision-html-export'
 import { buildCategoryMatrixHtml } from '../utils/category-html-export'
@@ -924,10 +925,9 @@ function PayablesSection() {
     setSelected(allSelected ? new Set() : new Set(accounts.map((account) => account.id)))
   }
 
-  const overdueAccounts = accounts.filter((account) => account.is_overdue)
   const selectedAccounts = accounts.filter((account) => selected.has(account.id))
   const remainingAccounts = accounts.filter((account) => !selected.has(account.id))
-  const overdueRemainingAccounts = overdueAccounts.filter((account) => !selected.has(account.id))
+  const overdueRemainingAccounts = accounts.filter((account) => isPayablesReportOverdue(account, selected))
   const totalOverdue = overdueRemainingAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
   const totalPaidToday = selectedAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
   const totalRemaining = remainingAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
@@ -992,7 +992,7 @@ function PayablesSection() {
         key: 'due_date',
         header: 'Vencimento',
         render: (account) => (
-          <span className={account.is_overdue ? 'font-medium text-danger' : account.is_due_today ? 'font-medium text-success' : 'text-muted'}>
+          <span className={isPayablesReportOverdue(account, selected) ? 'font-medium text-danger' : selected.has(account.id) ? 'font-medium text-success' : 'text-muted'}>
             {formatShortDate(account.due_date)}
           </span>
         ),
@@ -1070,7 +1070,7 @@ function PayablesSection() {
                       title={group.cost_center}
                       subtitle={`Em atraso: ${formatCurrency(
                         group.accounts
-                          .filter((account) => account.is_overdue && !selected.has(account.id))
+                          .filter((account) => isPayablesReportOverdue(account, selected))
                           .reduce((sum, account) => sum + account.remaining_amount, 0),
                       )} · Selecionado p/ hoje: ${formatCurrency(
                         group.accounts

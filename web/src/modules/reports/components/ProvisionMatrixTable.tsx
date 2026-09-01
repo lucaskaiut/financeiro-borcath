@@ -13,103 +13,105 @@ export function ProvisionMatrixTable({ data, compact = false, className }: Provi
   const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-3 py-2 text-xs'
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className="min-w-full border-collapse">
-        <thead>
-          <tr className="border-b border-surface-3 bg-surface-2/80">
-            <th
-              className={cn(
-                'sticky left-0 z-20 bg-surface-2/95 text-left font-semibold tracking-wide text-muted uppercase',
-                headerClass,
-              )}
-            >
-              Conta
-            </th>
-            {data.columns.map((column) => (
-              <th
-                key={column.key}
-                className={cn('whitespace-nowrap text-right font-semibold tracking-wide text-muted uppercase', headerClass)}
-              >
-                {column.label}
-              </th>
-            ))}
-            <th className={cn('whitespace-nowrap text-right font-semibold tracking-wide text-muted uppercase', headerClass)}>
-              Total
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.groups.map((group) => (
-            <GroupRows
-              key={group.cost_center}
-              group={group}
-              columns={data.columns}
-              cellClass={cellClass}
-              compact={compact}
-            />
-          ))}
+    <div className={cn('space-y-8', className)}>
+      {data.groups.map((group) => (
+        <section key={group.cost_center} className="overflow-x-auto">
+          <div
+            className={cn(
+              'rounded-t-lg bg-surface-2 px-4 py-3 font-bold uppercase tracking-wide text-foreground',
+              compact ? 'text-xs' : 'text-sm',
+            )}
+          >
+            {group.cost_center}
+          </div>
 
-          <GrandTotalRow grandTotal={data.grand_total} columns={data.columns} cellClass={cellClass} compact={compact} />
-        </tbody>
-      </table>
+          <table className="min-w-full border-collapse">
+            <ColumnHeaderRow columns={data.columns} headerClass={headerClass} />
+            <tbody>
+              {group.rows.map((row) => (
+                <tr key={row.account_id} className="border-b border-surface-3/60">
+                  <td className={cn('sticky left-0 z-10 bg-background font-medium text-foreground', cellClass)}>
+                    {row.description}
+                  </td>
+                  {data.columns.map((column) => {
+                    const value = row.amounts[column.key]
+
+                    return (
+                      <td
+                        key={column.key}
+                        className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionAccountAmountClass(value))}
+                      >
+                        {formatProvisionAmount(value)}
+                      </td>
+                    )
+                  })}
+                  <td className={cellClass} />
+                </tr>
+              ))}
+
+              <tr className={cn('border-b border-surface-3 bg-surface-2/70 font-semibold', compact ? 'text-[11px]' : 'text-sm')}>
+                <td className={cn('sticky left-0 z-10 bg-surface-2/95 text-foreground', cellClass)}>Subtotal</td>
+                {data.columns.map((column) => {
+                  const value = group.subtotal.amounts[column.key]
+
+                  return (
+                    <td
+                      key={column.key}
+                      className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionTotalAmountClass(value))}
+                    >
+                      {formatProvisionAmount(value)}
+                    </td>
+                  )
+                })}
+                <td className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionTotalAmountClass(group.subtotal.total))}>
+                  {formatProvisionAmount(group.subtotal.total)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      ))}
+
+      <section className="overflow-x-auto">
+        <div
+          className={cn(
+            'rounded-t-lg bg-surface-2 px-4 py-3 font-bold uppercase tracking-wide text-foreground',
+            compact ? 'text-xs' : 'text-sm',
+          )}
+        >
+          Total geral
+        </div>
+
+        <table className="min-w-full border-collapse">
+          <ColumnHeaderRow columns={data.columns} headerClass={headerClass} />
+          <tbody>
+            <GrandTotalRow grandTotal={data.grand_total} columns={data.columns} cellClass={cellClass} compact={compact} />
+          </tbody>
+        </table>
+      </section>
     </div>
   )
 }
 
-function GroupRows({
-  group,
+function ColumnHeaderRow({
   columns,
-  cellClass,
-  compact,
+  headerClass,
 }: {
-  group: ProvisionReport['groups'][number]
   columns: ProvisionReport['columns']
-  cellClass: string
-  compact: boolean
+  headerClass: string
 }) {
   return (
-    <>
-      <tr className="border-t border-surface-3 bg-surface-2/50">
-        <td
-          colSpan={columns.length + 2}
-          className={cn('sticky left-0 z-10 bg-surface-2/95 font-semibold text-foreground', cellClass)}
-        >
-          {group.cost_center}
-        </td>
+    <thead>
+      <tr className="border-b border-surface-3 bg-surface-2/50 text-left uppercase tracking-wide text-muted">
+        <th className={cn('sticky left-0 z-20 bg-surface-2/95 font-semibold', headerClass)}>Conta</th>
+        {columns.map((column) => (
+          <th key={column.key} className={cn('whitespace-nowrap text-right font-semibold', headerClass)}>
+            {column.label}
+          </th>
+        ))}
+        <th className={cn('whitespace-nowrap text-right font-semibold', headerClass)}>Total</th>
       </tr>
-
-      {group.rows.map((row) => (
-        <tr key={row.account_id} className="border-b border-surface-3/60">
-          <td className={cn('sticky left-0 z-10 bg-background font-medium text-foreground', cellClass)}>{row.description}</td>
-          {columns.map((column) => {
-            const value = row.amounts[column.key]
-
-            return (
-              <td key={column.key} className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionAccountAmountClass(value))}>
-                {formatProvisionAmount(value)}
-              </td>
-            )
-          })}
-          <td className={cellClass} />
-        </tr>
-      ))}
-
-      <tr className={cn('border-b border-surface-3 bg-surface-2/70 font-semibold', compact ? 'text-[11px]' : 'text-sm')}>
-        <td className={cn('sticky left-0 z-10 bg-surface-2/95 text-foreground', cellClass)}>Subtotal</td>
-        {columns.map((column) => {
-          const value = group.subtotal.amounts[column.key]
-
-          return (
-            <td key={column.key} className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionTotalAmountClass(value))}>
-              {formatProvisionAmount(value)}
-            </td>
-          )
-        })}
-        <td className={cn('whitespace-nowrap text-right tabular-nums', cellClass, provisionTotalAmountClass(group.subtotal.total))}>
-          {formatProvisionAmount(group.subtotal.total)}
-        </td>
-      </tr>
-    </>
+    </thead>
   )
 }
 

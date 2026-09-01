@@ -6,19 +6,27 @@ function cell(value: number | null | undefined): string {
   return formatProvisionAmount(value)
 }
 
+function columnHeaderRow(headers: string[]): string {
+  return `<tr>${headers
+    .map(
+      (header, index) =>
+        `<th style="padding:8px 6px;text-align:${index === 0 ? 'left' : 'right'};background:#f9fafb;border-bottom:1px solid #d1d5db;font-size:10px;text-transform:uppercase;color:#6b7280;">${header}</th>`,
+    )
+    .join('')}</tr>`
+}
+
 export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, subtitle: string): string {
   const headers = ['Conta', ...data.columns.map((column) => column.label), 'Total']
   const sections: string[] = []
 
   for (const group of data.groups) {
-    sections.push(`<tr><td colspan="${headers.length}" style="font-weight:700;padding:8px 6px;background:#f3f4f6;">${group.cost_center}</td></tr>`)
+    sections.push(
+      `<tr><td colspan="${headers.length}" style="padding:10px 8px;font-weight:700;background:#e5e7eb;text-transform:uppercase;">${group.cost_center}</td></tr>`,
+    )
+    sections.push(columnHeaderRow(headers))
 
     for (const row of group.rows) {
-      const cells = [
-        row.description,
-        ...data.columns.map((column) => cell(row.amounts[column.key])),
-        '',
-      ]
+      const cells = [row.description, ...data.columns.map((column) => cell(row.amounts[column.key])), '']
 
       sections.push(
         `<tr>${cells
@@ -44,8 +52,13 @@ export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, s
         )
         .join('')}</tr>`,
     )
-    sections.push('<tr><td colspan="' + headers.length + '" style="height:8px;"></td></tr>')
+    sections.push(`<tr><td colspan="${headers.length}" style="height:12px;"></td></tr>`)
   }
+
+  sections.push(
+    `<tr><td colspan="${headers.length}" style="padding:10px 8px;font-weight:700;background:#e5e7eb;text-transform:uppercase;">Total geral</td></tr>`,
+  )
+  sections.push(columnHeaderRow(headers))
 
   const grandCells = [
     'Total geral',
@@ -72,8 +85,6 @@ export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, s
     h1 { font-size: 18px; margin: 0 0 4px; }
     p { margin: 0 0 16px; color: #4b5563; font-size: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { background: #f3f4f6; padding: 8px 6px; text-align: right; border-bottom: 1px solid #d1d5db; }
-    th:first-child { text-align: left; }
     .summary { margin-top: 16px; font-size: 12px; }
     .summary div { display: flex; justify-content: space-between; padding: 4px 0; }
   </style>
@@ -82,9 +93,6 @@ export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, s
   <h1>${title}</h1>
   <p>${subtitle}</p>
   <table>
-    <thead>
-      <tr>${headers.map((header, index) => `<th style="text-align:${index === 0 ? 'left' : 'right'};">${header}</th>`).join('')}</tr>
-    </thead>
     <tbody>
       ${sections.join('')}
     </tbody>

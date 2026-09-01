@@ -1,12 +1,12 @@
 import { formatDate } from '@/shared/utils/format'
-import type { CategoryMatrix, CategoryMatrixAccountRow, CategoryMatrixTotals } from '../services/reports.service'
+import type { CategoryMatrix, CategoryMatrixTotals } from '../services/reports.service'
 import { formatCategoryAmount } from './category-format'
 
 function cell(value: number | null | undefined): string {
   return formatCategoryAmount(value)
 }
 
-function amountCells(totals: CategoryMatrixTotals | CategoryMatrixAccountRow, matrix: CategoryMatrix): string {
+function amountCells(totals: CategoryMatrixTotals, matrix: CategoryMatrix): string {
   const values = [
     ...matrix.columns.map((column) => cell(totals.amounts[column.key])),
     cell(totals.total),
@@ -17,17 +17,10 @@ function amountCells(totals: CategoryMatrixTotals | CategoryMatrixAccountRow, ma
     .join('')
 }
 
-function totalRow(label: string, totals: CategoryMatrixTotals | CategoryMatrixAccountRow, matrix: CategoryMatrix, style: string, paddingLeft = '6px'): string {
+function totalRow(label: string, totals: CategoryMatrixTotals, matrix: CategoryMatrix, style: string, paddingLeft = '6px'): string {
   return `<tr style="${style}">
     <td style="padding:6px;padding-left:${paddingLeft};text-align:left;border-bottom:1px solid #93c5fd;">${label}</td>
     ${amountCells(totals, matrix)}
-  </tr>`
-}
-
-function accountRow(label: string, row: CategoryMatrixAccountRow, matrix: CategoryMatrix, paddingLeft: string): string {
-  return `<tr>
-    <td style="padding:6px;padding-left:${paddingLeft};text-align:left;border-bottom:1px solid #e5e7eb;">${label}</td>
-    ${amountCells(row, matrix)}
   </tr>`
 }
 
@@ -49,18 +42,10 @@ export function buildCategoryMatrixHtml(
         totalRow(`${category.category} - Totais`, category.subtotal, matrix, 'font-weight:600;background:#dbeafe;'),
       )
 
-      for (const row of category.direct_rows) {
-        sections.push(accountRow(row.label, row, matrix, '24px'))
-      }
-
       for (const subcategory of category.subcategories) {
         sections.push(
           totalRow(`${subcategory.subcategory} - Totais`, subcategory.subtotal, matrix, 'font-weight:600;background:#eff6ff;', '24px'),
         )
-
-        for (const row of subcategory.rows) {
-          sections.push(accountRow(row.label, row, matrix, '40px'))
-        }
       }
     }
 

@@ -3,6 +3,8 @@
 namespace Tests\Feature\Finance;
 
 use App\Modules\Account\Models\FinancialAccount;
+use App\Modules\Report\Services\ReportService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -519,6 +521,53 @@ OFX;
         $this->postJson("/api/reconciliation/transactions/{$transactionId}/undo")->assertOk();
 
         $this->getJson('/api/reconciliation/transactions?status=pending')->assertOk()->assertJsonPath('meta.total', 1);
+    }
+
+    public function test_payables_report_treats_unselected_due_today_as_overdue(): void
+    {
+        Carbon::setTestNow('2026-09-01 10:00:00');
+
+        try {
+            $tenant = $this->createTenantWithRoles();
+            Sanctum::actingAs($this->createAdmin($tenant));
+
+            $costCenterId = $this->createCostCenter();
+            $categoryId = $this->createCategory('expense');
+
+            $dueTodayId = $this->postJson('/api/accounts', [
+                'type' => 'payable',
+                'description' => 'Conta do dia',
+                'cost_center_id' => $costCenterId,
+                'category_id' => $categoryId,
+                'value' => 500,
+                'due_date' => '2026-09-01',
+            ])->json('data.0.id');
+
+            $response = $this->getJson('/api/reports/payables')->assertOk();
+
+            $this->assertEquals(500, $response->json('data.total_overdue'));
+
+            $account = collect($response->json('data.accounts'))->firstWhere('id', $dueTodayId);
+            $this->assertTrue($account['is_due_today']);
+            $this->assertFalse($account['is_overdue']);
+
+            $service = app(ReportService::class);
+            $data = $service->payables();
+            $method = new \ReflectionMethod($service, 'buildPayablesExportGroups');
+            $method->setAccessible(true);
+
+            $unselectedGroups = $method->invoke($service, $data['accounts'], [], $data['reference_date']);
+            $this->assertCount(1, $unselectedGroups[0]['overdue']['accounts']);
+            $this->assertSame($dueTodayId, $unselectedGroups[0]['overdue']['accounts'][0]['id']);
+            $this->assertCount(0, $unselectedGroups[0]['due_today']['accounts']);
+
+            $selectedGroups = $method->invoke($service, $data['accounts'], [$dueTodayId], $data['reference_date']);
+            $this->assertCount(0, $selectedGroups[0]['overdue']['accounts']);
+            $this->assertCount(1, $selectedGroups[0]['due_today']['accounts']);
+            $this->assertSame($dueTodayId, $selectedGroups[0]['due_today']['accounts'][0]['id']);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_reports_endpoints_respond(): void

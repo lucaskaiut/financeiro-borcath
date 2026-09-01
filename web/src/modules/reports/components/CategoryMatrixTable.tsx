@@ -1,6 +1,6 @@
 import { cn } from '@/shared/utils/cn'
-import type { CategoryMatrix, CategoryMatrixAccountRow, CategoryMatrixTotals } from '../services/reports.service'
-import { categoryAmountClass, categoryTotalAmountClass, formatCategoryAmount } from '../utils/category-format'
+import type { CategoryMatrix, CategoryMatrixTotals } from '../services/reports.service'
+import { categoryTotalAmountClass, formatCategoryAmount } from '../utils/category-format'
 
 interface CategoryMatrixTableProps {
   matrix: CategoryMatrix
@@ -62,7 +62,7 @@ function AmountCells({
   cellClass,
   valueClass,
 }: {
-  totals: CategoryMatrixTotals | CategoryMatrixAccountRow
+  totals: CategoryMatrixTotals
   matrix: CategoryMatrix
   cellClass: string
   valueClass: (value: number | null | undefined) => string
@@ -139,10 +139,6 @@ function CategoryRows({
         <AmountCells totals={category.subtotal} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
       </tr>
 
-      {category.direct_rows.map((row) => (
-        <AccountRow key={row.label} row={row} matrix={matrix} cellClass={cellClass} indentClass="pl-6" />
-      ))}
-
       {category.subcategories.map((subcategory) => (
         <SubcategoryRows key={subcategory.subcategory} subcategory={subcategory} matrix={matrix} cellClass={cellClass} />
       ))}
@@ -167,32 +163,7 @@ function SubcategoryRows({
         </td>
         <AmountCells totals={subcategory.subtotal} matrix={matrix} cellClass={cellClass} valueClass={categoryTotalAmountClass} />
       </tr>
-
-      {subcategory.rows.map((row) => (
-        <AccountRow key={row.label} row={row} matrix={matrix} cellClass={cellClass} indentClass="pl-10" />
-      ))}
     </>
-  )
-}
-
-function AccountRow({
-  row,
-  matrix,
-  cellClass,
-  indentClass,
-}: {
-  row: CategoryMatrixAccountRow
-  matrix: CategoryMatrix
-  cellClass: string
-  indentClass: string
-}) {
-  return (
-    <tr className="border-b border-surface-3/60">
-      <td className={cn('sticky left-0 z-10 bg-background text-foreground', labelColumnClass, indentClass, cellClass)}>
-        {row.label}
-      </td>
-      <AmountCells totals={row} matrix={matrix} cellClass={cellClass} valueClass={categoryAmountClass} />
-    </tr>
   )
 }
 
