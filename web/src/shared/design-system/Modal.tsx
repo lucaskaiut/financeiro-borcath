@@ -10,7 +10,7 @@ export interface ModalProps {
   description?: ReactNode
   children?: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   dismissable?: boolean
 }
 
@@ -18,6 +18,8 @@ const SIZES = {
   sm: 'max-w-md',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-6xl',
+  '2xl': 'max-w-[calc(100vw-2rem)]',
 }
 
 export function Modal({

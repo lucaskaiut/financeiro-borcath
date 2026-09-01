@@ -516,6 +516,7 @@ OFX;
         $this->getJson('/api/reports/weekly')->assertOk();
         $this->getJson('/api/reports/provision?days=30')->assertOk();
         $this->getJson('/api/reports/by-category')->assertOk();
+        $this->getJson('/api/reports/monthly-summary')->assertOk();
         $this->getJson('/api/reports/by-cost-center')->assertOk();
         $this->getJson('/api/reports/cash-flow')->assertOk();
         $this->getJson('/api/reports/payables')->assertOk();

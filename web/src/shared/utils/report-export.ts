@@ -21,6 +21,7 @@ export function printHtmlReport(title: string, content: string): void {
       body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
       h1 { font-size: 20px; margin-bottom: 4px; }
       h2 { font-size: 15px; margin: 0 0 16px; font-weight: normal; color: #444; }
+      h3 { font-size: 13px; margin: 16px 0 8px; font-weight: bold; }
       table { width: 100%; border-collapse: collapse; font-size: 12px; }
       th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
       th { background: #f3f3f3; }

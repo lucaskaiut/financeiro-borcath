@@ -13,7 +13,10 @@ class ReportController extends ApiController
 
     public function daily(Request $request): JsonResponse
     {
-        return $this->success($this->service->daily($request->string('date')->toString() ?: null));
+        return $this->success($this->service->daily(
+            $request->string('date')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        ));
     }
 
     public function weekly(Request $request): JsonResponse
@@ -21,6 +24,7 @@ class ReportController extends ApiController
         return $this->success($this->service->weekly(
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
         ));
     }
 
@@ -32,6 +36,23 @@ class ReportController extends ApiController
             (int) $request->integer('days', 30),
             $request->string('cost_center_id')->toString() ?: null,
         ));
+    }
+
+    public function dailyExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->dailyExport(
+            $request->string('date')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        );
+    }
+
+    public function weeklyExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->weeklyExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        );
     }
 
     public function provisionExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
@@ -49,12 +70,71 @@ class ReportController extends ApiController
         return $this->success($this->service->byCategory(
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
         ));
     }
 
-    public function byCostCenter(): JsonResponse
+    public function byCostCenter(Request $request): JsonResponse
     {
-        return $this->success($this->service->byCostCenter());
+        return $this->success($this->service->byCostCenter(
+            $request->string('cost_center_id')->toString() ?: null,
+        ));
+    }
+
+    public function byCategoryExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->byCategoryExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        );
+    }
+
+    public function monthlySummary(Request $request): JsonResponse
+    {
+        return $this->success($this->service->monthlySummary(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        ));
+    }
+
+    public function monthlySummaryExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->monthlySummaryExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+        );
+    }
+
+    public function byCostCenterExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->byCostCenterExport(
+            $request->string('cost_center_id')->toString() ?: null,
+        );
+    }
+
+    public function cashFlowExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $this->service->cashFlowExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            (int) $request->integer('days', 30),
+            $request->string('cost_center_id')->toString() ?: null,
+        );
+    }
+
+    public function payablesExport(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $selectedIds = array_values(array_filter(explode(',', $request->string('selected_ids')->toString())));
+
+        return $this->service->payablesExport(
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null,
+            $request->string('cost_center_id')->toString() ?: null,
+            $selectedIds,
+        );
     }
 
     public function cashFlow(Request $request): JsonResponse

@@ -1,4 +1,9 @@
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' })
+const shortDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+})
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short',
@@ -37,6 +42,12 @@ export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
 
   return dateFormatter.format(parseDateInput(value))
+}
+
+export function formatShortDate(value: string | null | undefined): string {
+  if (!value) return '—'
+
+  return shortDateFormatter.format(parseDateInput(value))
 }
 
 export function formatDateTime(value: string | null | undefined): string {

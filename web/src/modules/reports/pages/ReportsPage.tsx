@@ -1,5 +1,19 @@
-import { Fragment, useState } from 'react'
-import { BarChart3, Check, ClipboardList, Download, Printer } from 'lucide-react'
+import { useState } from 'react'
+import { BarChart3, ClipboardList } from 'lucide-react'
+import { ReportScreenViewer, ReportViewButton, type ScreenReportColumn } from '../components/ReportScreenViewer'
+import { CategoryMatrixViewer, CategoryViewButton } from '../components/CategoryMatrixViewer'
+import { MonthlySummaryTable } from '../components/MonthlySummaryTable'
+import { MonthlySummaryViewer, MonthlySummaryViewButton } from '../components/MonthlySummaryViewer'
+import { CostCenterFilter, useCostCenterLabel } from '../components/CostCenterFilter'
+import { ReportExportButtons } from '../components/ReportExportButtons'
+import { ReportGroupHeader } from '../components/ReportGroupHeader'
+import { ProvisionMatrixTable } from '../components/ProvisionMatrixTable'
+import { ProvisionMatrixViewer, ProvisionViewButton } from '../components/ProvisionMatrixViewer'
+import { buildPayablesExportReport, buildPayablesReportHtml } from '../utils/payables-html-export'
+import { PayablesReportViewer, PayablesViewButton } from '../components/PayablesReportViewer'
+import { buildProvisionMatrixHtml } from '../utils/provision-html-export'
+import { buildCategoryMatrixHtml } from '../utils/category-html-export'
+import { buildMonthlySummaryHtml } from '../utils/monthly-summary-html-export'
 import {
   Badge,
   Button,
@@ -9,7 +23,6 @@ import {
   DataTable,
   DateRangeFilter,
   EmptyState,
-  Modal,
   Page,
   PageContent,
   PageHeader,
@@ -17,23 +30,27 @@ import {
   Skeleton,
   type Column,
 } from '@/shared/design-system'
-import { Can } from '@/app/guards/PermissionGuard'
-import { Permission } from '@/shared/constants/permissions'
-import { formatCurrency, formatDate, toLocalIsoDate } from '@/shared/utils/format'
+import { formatCurrency, formatDate, formatShortDate, toLocalIsoDate } from '@/shared/utils/format'
 import { addDays, toIsoDate } from '@/shared/utils/date'
-import { useCostCenterOptions } from '@/modules/cost-centers/hooks/useCostCenters'
 import {
   useCashFlowStatement,
   useCategoryReport,
   useCostCenterReport,
   useDailyReport,
+  useMonthlySummaryReport,
   usePayablesReport,
   useProvisionReport,
   useWeeklyReport,
 } from '../hooks/useReports'
-import type { CashFlowStatement, CostCenterReportRow, PayableAccount } from '../services/reports.service'
-import type { ProjectedItem } from '@/modules/cash-flow/services/cash-flow.service'
-import { downloadBlob, escapeHtml, printHtmlReport } from '@/shared/utils/report-export'
+import type {
+  CategoryCostCenterGroup,
+  CostCenterReportRow,
+  DailyCostCenterGroup,
+  PayableAccount,
+  WeeklyCostCenterGroup,
+} from '../services/reports.service'
+import { printHtmlReport } from '@/shared/utils/report-export'
+import { buildReportHtml } from '../utils/report-html-export'
 import { reportsService } from '../services/reports.service'
 
 const TABS = [
@@ -41,6 +58,7 @@ const TABS = [
   { id: 'weekly', label: 'Semanal' },
   { id: 'provision', label: 'Provisão' },
   { id: 'category', label: 'Por categoria' },
+  { id: 'monthly-summary', label: 'Resumo mensal' },
   { id: 'cost-center', label: 'Por centro de custo' },
   { id: 'cash-flow', label: 'Demonstrativo' },
   { id: 'payables', label: 'Contas a pagar' },
@@ -84,6 +102,7 @@ export default function ReportsPage() {
         {tab === 'weekly' && <WeeklySection />}
         {tab === 'provision' && <ProvisionSection />}
         {tab === 'category' && <CategorySection />}
+        {tab === 'monthly-summary' && <MonthlySummarySection />}
         {tab === 'cost-center' && <CostCenterSection />}
         {tab === 'cash-flow' && <CashFlowSection />}
         {tab === 'payables' && <PayablesSection />}
@@ -94,32 +113,163 @@ export default function ReportsPage() {
 
 function DailySection() {
   const [date, setDate] = useState(today)
-  const query = useDailyReport({ date })
+  const [costCenterId, setCostCenterId] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
+  const query = useDailyReport({ date, cost_center_id: costCenterId || undefined })
+
+  type MovementRow = NonNullable<typeof query.data>['payments'][number]
+
+  const movementColumns: ScreenReportColumn<MovementRow>[] = [
+    { key: 'description', header: 'Descrição', cell: (row) => row.description },
+    { key: 'category', header: 'Categoria', cell: (row) => row.category ?? '—' },
+    { key: 'value', header: 'Valor', align: 'right', cell: (row) => formatCurrency(row.value) },
+  ]
+
+  const dailyGroups = query.data?.groups ?? []
+  const movementHeaders = ['Descrição', 'Categoria', 'Valor']
+  const movementRows = (items: MovementRow[]) =>
+    items.map((item) => [item.description, item.category ?? '—', formatCurrency(item.value)])
+  const exportParams = { date, cost_center_id: costCenterId || undefined }
+
+  const dailyScreenSections = dailyGroups.flatMap((group) => {
+    const sections = []
+
+    if (group.payments.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Pagamentos`,
+        rows: group.payments,
+        footer: { label: 'Total pago', value: formatCurrency(group.total_paid) },
+      })
+    }
+
+    if (group.receipts.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Recebimentos`,
+        rows: group.receipts,
+        footer: { label: 'Total recebido', value: formatCurrency(group.total_received) },
+      })
+    }
+
+    if (group.payments.length > 0 || group.receipts.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Saldo do centro`,
+        rows: [] as MovementRow[],
+        footer: { label: 'Saldo', value: formatCurrency(group.balance) },
+      })
+    }
+
+    return sections
+  })
+
+  const dailyPdfSections = dailyGroups.flatMap((group) => {
+    const sections = []
+
+    if (group.payments.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Pagamentos`,
+        headers: movementHeaders,
+        rows: movementRows(group.payments),
+        amountColumns: [2],
+        footer: { label: 'Total pago', value: formatCurrency(group.total_paid) },
+      })
+    }
+
+    if (group.receipts.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Recebimentos`,
+        headers: movementHeaders,
+        rows: movementRows(group.receipts),
+        amountColumns: [2],
+        footer: { label: 'Total recebido', value: formatCurrency(group.total_received) },
+      })
+    }
+
+    if (group.payments.length > 0 || group.receipts.length > 0) {
+      sections.push({
+        title: `${group.cost_center} · Saldo do centro`,
+        headers: movementHeaders,
+        rows: [],
+        footer: { label: 'Saldo', value: formatCurrency(group.balance) },
+      })
+    }
+
+    return sections
+  })
 
   return (
     <Card>
       <CardContent className="space-y-4">
-        <DateRangeFilter
-          variant="single"
-          from={date}
-          to={date}
-          onChange={({ to }) => setDate(to)}
-        />
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            variant="single"
+            from={date}
+            to={date}
+            onChange={({ to }) => setDate(to)}
+          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+        </div>
 
         {query.isPending ? (
           <Skeleton className="h-40" />
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
-              <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
-              <Summary label="Saldo do dia" value={query.data?.balance ?? 0} />
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="grid flex-1 gap-4 sm:grid-cols-3">
+                <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
+                <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
+                <Summary label="Saldo do dia" value={query.data?.balance ?? 0} />
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <ReportViewButton onClick={() => setViewerOpen(true)} />
+                <ReportExportButtons
+                  disabled={query.isPending}
+                  onExportXlsx={() => reportsService.dailyExport(exportParams)}
+                  onExportPdf={() =>
+                    printHtmlReport(
+                      'Relatório diário',
+                      buildReportHtml({
+                        title: 'Relatório diário',
+                        subtitle: `Data: ${formatDate(date)} · ${costCenterLabel}`,
+                        sections: dailyPdfSections,
+                        summary: [
+                          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
+                          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
+                          { label: 'Saldo do dia', value: formatCurrency(query.data?.balance ?? 0) },
+                        ],
+                      }),
+                    )
+                  }
+                />
+              </div>
             </div>
-            <MovementsList title="Pagamentos realizados" items={query.data?.payments ?? []} />
-            <MovementsList title="Recebimentos realizados" items={query.data?.receipts ?? []} />
+            <div className="space-y-6">
+              {dailyGroups.length === 0 ? (
+                <EmptyState icon={BarChart3} title="Sem movimentações no dia" />
+              ) : (
+                dailyGroups.map((group) => (
+                  <DailyCostCenterBlock key={group.cost_center} group={group} />
+                ))
+              )}
+            </div>
           </>
         )}
       </CardContent>
+
+      <ReportScreenViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        title="Relatório diário"
+        description={`Data: ${formatDate(date)} · ${costCenterLabel}`}
+        columns={movementColumns}
+        sections={dailyScreenSections}
+        summary={[
+          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
+          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
+          { label: 'Saldo do dia', value: formatCurrency(query.data?.balance ?? 0) },
+        ]}
+        rowKey={(row, index) => `${row.description}-${index}`}
+      />
     </Card>
   )
 }
@@ -127,30 +277,119 @@ function DailySection() {
 function WeeklySection() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const query = useWeeklyReport({ from: from || undefined, to: to || undefined })
+  const [costCenterId, setCostCenterId] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
+  const query = useWeeklyReport({ from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined })
+
+  type WeeklyGroupRow = WeeklyCostCenterGroup
+
+  const weeklyColumns: ScreenReportColumn<WeeklyGroupRow>[] = [
+    { key: 'cost_center', header: 'Centro de custo', cell: (row) => row.cost_center },
+    { key: 'total_paid', header: 'Total pago', align: 'right', cell: (row) => formatCurrency(row.total_paid) },
+    { key: 'total_received', header: 'Total recebido', align: 'right', cell: (row) => formatCurrency(row.total_received) },
+    { key: 'net_balance', header: 'Saldo líquido', align: 'right', cell: (row) => formatCurrency(row.net_balance) },
+  ]
+
+  const weeklyGroups = query.data?.groups ?? []
+
+  const periodLabel =
+    query.data?.from && query.data?.to
+      ? `${formatDate(query.data.from)} até ${formatDate(query.data.to)}`
+      : from && to
+        ? `${formatDate(from)} até ${formatDate(to)}`
+        : 'Período não definido'
+
+  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
 
   return (
     <Card>
       <CardContent className="space-y-4">
-        <DateRangeFilter
-          from={from}
-          to={to}
-          onChange={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
+          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+        </div>
 
         {query.isPending ? (
           <Skeleton className="h-32" />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
-            <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
-            <Summary label="Saldo líquido" value={query.data?.net_balance ?? 0} />
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="grid flex-1 gap-4 sm:grid-cols-3">
+              <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
+              <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
+              <Summary label="Saldo líquido" value={query.data?.net_balance ?? 0} />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <ReportViewButton onClick={() => setViewerOpen(true)} />
+              <ReportExportButtons
+                disabled={query.isPending}
+                onExportXlsx={() => reportsService.weeklyExport(exportParams)}
+                onExportPdf={() =>
+                  printHtmlReport(
+                    'Relatório semanal',
+                    buildReportHtml({
+                      title: 'Relatório semanal',
+                      subtitle: `Período: ${periodLabel} · ${costCenterLabel}`,
+                      sections: weeklyGroups.map((group) => ({
+                        title: group.cost_center,
+                        headers: ['Total pago', 'Total recebido', 'Saldo líquido'],
+                        rows: [[formatCurrency(group.total_paid), formatCurrency(group.total_received), formatCurrency(group.net_balance)]],
+                        amountColumns: [0, 1, 2],
+                        footer: { label: 'Saldo do centro', value: formatCurrency(group.net_balance) },
+                      })),
+                      summary: [
+                        { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
+                        { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
+                        { label: 'Saldo líquido', value: formatCurrency(query.data?.net_balance ?? 0) },
+                      ],
+                    }),
+                  )
+                }
+              />
+            </div>
           </div>
         )}
+        {!query.isPending && (
+          <DataTable
+            columns={[
+              { key: 'cost_center', header: 'Centro de custo', render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span> },
+              { key: 'total_paid', header: 'Total pago', render: (row) => <span className="text-danger">{formatCurrency(row.total_paid)}</span> },
+              { key: 'total_received', header: 'Total recebido', render: (row) => <span className="text-success">{formatCurrency(row.total_received)}</span> },
+              { key: 'net_balance', header: 'Saldo líquido', render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.net_balance)}</span> },
+            ]}
+            rows={weeklyGroups}
+            rowKey={(row) => row.cost_center}
+            loading={query.isPending}
+            emptyState={<EmptyState icon={BarChart3} title="Sem movimentações no período" />}
+          />
+        )}
       </CardContent>
+
+      <ReportScreenViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        title="Relatório semanal"
+        description={`Período: ${periodLabel} · ${costCenterLabel}`}
+        columns={weeklyColumns}
+        sections={weeklyGroups.map((group) => ({
+          title: group.cost_center,
+          rows: [group],
+          footer: { label: 'Saldo do centro', value: formatCurrency(group.net_balance) },
+        }))}
+        summary={[
+          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
+          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
+          { label: 'Saldo líquido', value: formatCurrency(query.data?.net_balance ?? 0) },
+        ]}
+        rowKey={(row) => row.cost_center}
+      />
     </Card>
   )
 }
@@ -159,88 +398,27 @@ function ProvisionSection() {
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(defaultProvisionTo)
   const [costCenterId, setCostCenterId] = useState('')
-  const [exportingXlsx, setExportingXlsx] = useState(false)
-  const costCenters = useCostCenterOptions()
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
   const query = useProvisionReport({
     from: from || undefined,
     to: to || undefined,
     cost_center_id: costCenterId || undefined,
   })
 
-  const columns: Array<Column<{ description: string; due_date: string; remaining_amount: number; installment: string | null }>> = [
-    { key: 'due_date', header: 'Vencimento', render: (i) => <span className="text-muted">{formatDate(i.due_date)}</span> },
-    { key: 'description', header: 'Lançamento', render: (i) => <span className="font-medium text-foreground">{i.description}</span> },
-    { key: 'installment', header: 'Parcela', render: (i) => (i.installment ? <Badge variant="neutral">{i.installment}</Badge> : <span className="text-muted">—</span>) },
-    {
-      key: 'value',
-      header: 'Valor',
-      render: (i) => <span className="font-medium text-foreground">{formatCurrency(i.remaining_amount)}</span>,
-    },
-  ]
+  const data = query.data
+  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
+  const periodFrom = data?.from ?? from
+  const periodTo = data?.to ?? to
+  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · ${costCenterLabel}`
 
-  const items: ProjectedItem[] = [...(query.data?.accounts ?? []), ...(query.data?.installments ?? []), ...(query.data?.recurrences ?? [])].sort((a, b) => a.due_date.localeCompare(b.due_date))
+  const exportProvisionPdf = () => {
+    if (!data) return
 
-  const totalOut = query.data?.total_out ?? 0
-  const periodFrom = query.data?.from ?? from
-  const periodTo = query.data?.to ?? to
-  const costCenterLabel = costCenterId
-    ? (costCenters.data?.find((option) => option.value === costCenterId)?.label ?? 'Centro de custo')
-    : 'Todos os centros'
-
-  const exportXlsx = async () => {
-    setExportingXlsx(true)
-
-    try {
-      const blob = await reportsService.provisionExport({
-        from: from || undefined,
-        to: to || undefined,
-        cost_center_id: costCenterId || undefined,
-      })
-
-      downloadBlob(blob, 'relatorio-provisao.xlsx')
-    } finally {
-      setExportingXlsx(false)
-    }
-  }
-
-  const exportPdf = () => {
-    const tableRows = items
-      .map(
-        (item) => `<tr>
-          <td>${escapeHtml(formatDate(item.due_date))}</td>
-          <td>${escapeHtml(item.description)}</td>
-          <td>${escapeHtml(item.installment ?? '—')}</td>
-          <td>${escapeHtml(item.cost_center ?? '—')}</td>
-          <td>${escapeHtml(item.category ?? '—')}</td>
-          <td class="amount">${escapeHtml(formatCurrency(item.remaining_amount))}</td>
-        </tr>`,
-      )
-      .join('')
-
-    const content = `
-      <h1>Relatório de provisão</h1>
-      <h2>Período: ${escapeHtml(formatDate(periodFrom))} até ${escapeHtml(formatDate(periodTo))} · ${escapeHtml(costCenterLabel)}</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Vencimento</th>
-            <th>Lançamento</th>
-            <th>Parcela</th>
-            <th>Centro de custo</th>
-            <th>Categoria</th>
-            <th>Valor</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-      <div class="summary">
-        <p>Total a pagar: <strong>${escapeHtml(formatCurrency(totalOut))}</strong></p>
-      </div>
-    `
-
-    printHtmlReport('Relatório de provisão', content)
+    printHtmlReport(
+      'Relatório de provisão',
+      buildProvisionMatrixHtml(data, 'Relatório de provisão', subtitle),
+    )
   }
 
   return (
@@ -255,38 +433,41 @@ function ProvisionSection() {
               setTo(nextTo)
             }}
           />
-          <Select
-            aria-label="Centro de custo"
-            className="w-52"
-            value={costCenterId}
-            onChange={(e) => setCostCenterId(e.target.value)}
-            options={[{ value: '', label: 'Todos os centros' }, ...(costCenters.data ?? [])]}
-          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
         </div>
 
         {query.isPending ? (
-          <Skeleton className="h-20 max-w-xs" />
-        ) : (
-          <Summary label="Total a pagar" value={totalOut} accent="text-danger" />
-        )}
+          <Skeleton className="h-48" />
+        ) : data ? (
+          <>
+            <Summary label="Total a pagar" value={data.total_out} accent="text-danger" />
 
-        {!query.isPending && items.length > 0 && (
-          <div className="flex justify-end gap-2">
-            <Can permission={Permission.REPORTS_EXPORT}>
-              <Button variant="secondary" onClick={exportXlsx} loading={exportingXlsx}>
-                <Download className="size-4" />
-                Exportar XLSX
-              </Button>
-              <Button variant="secondary" onClick={exportPdf}>
-                <Printer className="size-4" />
-                Exportar PDF
-              </Button>
-            </Can>
-          </div>
-        )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <ProvisionViewButton onClick={() => setViewerOpen(true)} disabled={data.groups.length === 0} />
+              <ReportExportButtons
+                disabled={data.groups.length === 0}
+                onExportXlsx={() => reportsService.provisionExport(exportParams)}
+                onExportPdf={exportProvisionPdf}
+              />
+            </div>
 
-        <DataTable columns={columns} rows={items} rowKey={(i) => i.id ?? i.description + i.due_date} loading={query.isPending} emptyState={<EmptyState icon={BarChart3} title="Sem contas a pagar no período" />} />
+            {data.groups.length === 0 ? (
+              <EmptyState icon={BarChart3} title="Sem provisões no período" description="Não há contas em aberto para o filtro selecionado." />
+            ) : (
+              <ProvisionMatrixTable data={data} />
+            )}
+          </>
+        ) : null}
       </CardContent>
+
+      {data && (
+        <ProvisionMatrixViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          data={data}
+          costCenterLabel={costCenterLabel}
+        />
+      )}
     </Card>
   )
 }
@@ -294,35 +475,176 @@ function ProvisionSection() {
 function CategorySection() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const query = useCategoryReport({ from: from || undefined, to: to || undefined })
+  const [costCenterId, setCostCenterId] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
+  const query = useCategoryReport({
+    from: from || undefined,
+    to: to || undefined,
+    cost_center_id: costCenterId || undefined,
+  })
+
+  const periodLabel =
+    query.data?.from && query.data?.to
+      ? `${formatDate(query.data.from)} até ${formatDate(query.data.to)}`
+      : from && to
+        ? `${formatDate(from)} até ${formatDate(to)}`
+        : 'Período não definido'
+
+  const categoryGroups = query.data?.groups ?? []
+  const matrix = query.data?.matrix
+  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
+  const hasMatrixData = (matrix?.groups.length ?? 0) > 0
+
+  const exportCategoryPdf = () => {
+    if (!matrix) return
+
+    printHtmlReport(
+      'Relatório por categoria',
+      buildCategoryMatrixHtml(matrix, 'Relatório por categoria', `Período: ${periodLabel} · ${costCenterLabel}`),
+    )
+  }
 
   return (
     <Card>
       <CardContent className="space-y-4">
-        <DateRangeFilter
-          from={from}
-          to={to}
-          onChange={({ from: nextFrom, to: nextTo }) => {
-            setFrom(nextFrom)
-            setTo(nextTo)
-          }}
-        />
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
+          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+        </div>
 
         {query.isPending ? (
           <Skeleton className="h-40" />
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2">
-            <CategoryColumn title="Receitas por categoria" rows={query.data?.income ?? []} accent="text-success" />
-            <CategoryColumn title="Despesas por categoria" rows={query.data?.expense ?? []} accent="text-danger" />
-          </div>
+          <>
+            <div className="flex flex-wrap justify-end gap-2">
+              <CategoryViewButton onClick={() => setViewerOpen(true)} disabled={!hasMatrixData} />
+              <ReportExportButtons
+                disabled={!hasMatrixData}
+                onExportXlsx={() => reportsService.byCategoryExport(exportParams)}
+                onExportPdf={exportCategoryPdf}
+              />
+            </div>
+            <div className="space-y-6">
+              {categoryGroups.length === 0 ? (
+                <EmptyState icon={BarChart3} title="Sem dados no período" />
+              ) : (
+                categoryGroups.map((group) => (
+                  <CategoryCostCenterBlock key={group.cost_center} group={group} />
+                ))
+              )}
+            </div>
+          </>
         )}
       </CardContent>
+
+      {matrix && query.data && (
+        <CategoryMatrixViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          matrix={matrix}
+          from={query.data.from}
+          to={query.data.to}
+          costCenterLabel={costCenterLabel}
+        />
+      )}
+    </Card>
+  )
+}
+
+function MonthlySummarySection() {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [costCenterId, setCostCenterId] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
+  const query = useMonthlySummaryReport({
+    from: from || undefined,
+    to: to || undefined,
+    cost_center_id: costCenterId || undefined,
+  })
+
+  const data = query.data
+  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
+  const periodFrom = data?.from ?? from
+  const periodTo = data?.to ?? to
+  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · ${costCenterLabel}`
+  const hasData = (data?.rows.length ?? 0) > 0
+
+  const exportMonthlySummaryPdf = () => {
+    if (!data) return
+
+    printHtmlReport('Resumo mensal', buildMonthlySummaryHtml(data, 'Resumo mensal por centro de custo', subtitle))
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-start gap-4">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom)
+              setTo(nextTo)
+            }}
+          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+        </div>
+
+        {query.isPending ? (
+          <Skeleton className="h-48" />
+        ) : data ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Summary label="Total geral" value={data.grand_total.total} accent="text-danger" />
+              <Summary label="Média mês" value={data.monthly_average} accent="text-danger" />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <MonthlySummaryViewButton onClick={() => setViewerOpen(true)} disabled={!hasData} />
+              <ReportExportButtons
+                disabled={!hasData}
+                onExportXlsx={() => reportsService.monthlySummaryExport(exportParams)}
+                onExportPdf={exportMonthlySummaryPdf}
+              />
+            </div>
+
+            {!hasData ? (
+              <EmptyState icon={BarChart3} title="Sem despesas no período" description="Não há lançamentos liquidados para o filtro selecionado." />
+            ) : (
+              <MonthlySummaryTable data={data} />
+            )}
+          </>
+        ) : null}
+      </CardContent>
+
+      {data && (
+        <MonthlySummaryViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          data={data}
+          costCenterLabel={costCenterLabel}
+        />
+      )}
     </Card>
   )
 }
 
 function CostCenterSection() {
-  const query = useCostCenterReport()
+  const [costCenterId, setCostCenterId] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
+  const query = useCostCenterReport({ cost_center_id: costCenterId || undefined })
+
+  const rows = query.data?.rows ?? []
 
   const columns: Array<Column<CostCenterReportRow>> = [
     { key: 'name', header: 'Centro de custo', render: (r) => <span className="font-medium text-foreground">{r.cost_center}</span> },
@@ -332,11 +654,92 @@ function CostCenterSection() {
     { key: 'balance', header: 'Saldo', render: (r) => <span className="font-medium text-foreground">{formatCurrency(r.balance)}</span> },
   ]
 
+  const screenColumns: ScreenReportColumn<CostCenterReportRow>[] = [
+    { key: 'name', header: 'Centro de custo', cell: (row) => row.cost_center },
+    { key: 'initial', header: 'Saldo inicial', align: 'right', cell: (row) => formatCurrency(row.initial_balance) },
+    { key: 'income', header: 'Entradas', align: 'right', cell: (row) => formatCurrency(row.income) },
+    { key: 'expense', header: 'Saídas', align: 'right', cell: (row) => formatCurrency(row.expense) },
+    { key: 'balance', header: 'Saldo', align: 'right', cell: (row) => formatCurrency(row.balance) },
+  ]
+
+  const exportParams = { cost_center_id: costCenterId || undefined }
+  const costCenterHeaders = ['Centro de custo', 'Saldo inicial', 'Entradas', 'Saídas', 'Saldo']
+  const grandTotals = {
+    initial: rows.reduce((sum, row) => sum + row.initial_balance, 0),
+    income: rows.reduce((sum, row) => sum + row.income, 0),
+    expense: rows.reduce((sum, row) => sum + row.expense, 0),
+    balance: rows.reduce((sum, row) => sum + row.balance, 0),
+  }
+
   return (
     <Card>
-      <CardContent>
-        <DataTable columns={columns} rows={query.data?.rows ?? []} rowKey={(r) => r.cost_center_id} loading={query.isPending} emptyState={<EmptyState icon={BarChart3} title="Sem centros de custo" />} />
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+          {!query.isPending && (
+            <div className="flex flex-wrap justify-end gap-2">
+              <ReportViewButton onClick={() => setViewerOpen(true)} />
+              <ReportExportButtons
+                disabled={query.isPending}
+                onExportXlsx={() => reportsService.byCostCenterExport(exportParams)}
+                onExportPdf={() =>
+                  printHtmlReport(
+                    'Relatório por centro de custo',
+                    buildReportHtml({
+                      title: 'Relatório por centro de custo',
+                      subtitle: costCenterLabel,
+                      sections: [
+                        ...rows.map((row) => ({
+                          title: row.cost_center,
+                          headers: costCenterHeaders,
+                          rows: [[row.cost_center, formatCurrency(row.initial_balance), formatCurrency(row.income), formatCurrency(row.expense), formatCurrency(row.balance)]],
+                          amountColumns: [1, 2, 3, 4],
+                          footer: { label: 'Saldo do centro', value: formatCurrency(row.balance) },
+                        })),
+                      ],
+                      summary: [
+                        { label: 'Saldo inicial total', value: formatCurrency(grandTotals.initial) },
+                        { label: 'Entradas totais', value: formatCurrency(grandTotals.income) },
+                        { label: 'Saídas totais', value: formatCurrency(grandTotals.expense) },
+                        { label: 'Saldo total', value: formatCurrency(grandTotals.balance) },
+                      ],
+                    }),
+                  )
+                }
+              />
+            </div>
+          )}
+        </div>
+        <DataTable columns={columns} rows={rows} rowKey={(r) => r.cost_center_id} loading={query.isPending} emptyState={<EmptyState icon={BarChart3} title="Sem centros de custo" />} />
+        {!query.isPending && rows.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-4">
+            <Summary label="Saldo inicial total" value={grandTotals.initial} />
+            <Summary label="Entradas totais" value={grandTotals.income} accent="text-success" />
+            <Summary label="Saídas totais" value={grandTotals.expense} accent="text-danger" />
+            <Summary label="Saldo total" value={grandTotals.balance} />
+          </div>
+        )}
       </CardContent>
+
+      <ReportScreenViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        title="Relatório por centro de custo"
+        description={costCenterLabel}
+        columns={screenColumns}
+        sections={rows.map((row) => ({
+          title: row.cost_center,
+          rows: [row],
+          footer: { label: 'Saldo do centro', value: formatCurrency(row.balance) },
+        }))}
+        summary={[
+          { label: 'Saldo inicial total', value: formatCurrency(grandTotals.initial) },
+          { label: 'Entradas totais', value: formatCurrency(grandTotals.income) },
+          { label: 'Saídas totais', value: formatCurrency(grandTotals.expense) },
+          { label: 'Saldo total', value: formatCurrency(grandTotals.balance) },
+        ]}
+        rowKey={(row) => row.cost_center_id}
+      />
     </Card>
   )
 }
@@ -346,7 +749,8 @@ function CashFlowSection() {
   const [to, setTo] = useState('')
   const [days, setDays] = useState(30)
   const [costCenterId, setCostCenterId] = useState('')
-  const costCenters = useCostCenterOptions()
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
 
   const query = useCashFlowStatement({
     from: from || undefined,
@@ -355,26 +759,27 @@ function CashFlowSection() {
     cost_center_id: costCenterId || undefined,
   })
 
-  const downloadCsv = (data: CashFlowStatement) => {
-    const rows = [
-      ['Indicador', 'Valor'],
-      ['Saldo inicial (realizado)', data.realized.opening_balance.toFixed(2)],
-      ['Entradas realizadas', data.realized.total_in.toFixed(2)],
-      ['Saídas realizadas', data.realized.total_out.toFixed(2)],
-      ['Resultado realizado', data.comparative.realized_net.toFixed(2)],
-      ['Entradas projetadas', data.projected.total_in.toFixed(2)],
-      ['Saídas projetadas', data.projected.total_out.toFixed(2)],
-      ['Resultado projetado', data.comparative.projected_net.toFixed(2)],
-      ['Saldo final esperado', data.comparative.expected_final_balance.toFixed(2)],
-    ]
-    const csv = rows.map((r) => r.join(';')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'demonstrativo-fluxo-caixa.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+  const cashFlowGroups = query.data?.groups ?? []
+
+  const cashFlowGroupColumns: Array<Column<(typeof cashFlowGroups)[number]>> = [
+    { key: 'cost_center', header: 'Centro de custo', render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span> },
+    { key: 'realized_net', header: 'Resultado realizado', render: (row) => <span className="text-foreground">{formatCurrency(row.realized_net)}</span> },
+    { key: 'projected_net', header: 'Resultado projetado', render: (row) => <span className="text-foreground">{formatCurrency(row.projected_net)}</span> },
+    { key: 'expected_final_balance', header: 'Saldo final esperado', render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.expected_final_balance)}</span> },
+  ]
+
+  const cashFlowGroupScreenColumns: ScreenReportColumn<(typeof cashFlowGroups)[number]>[] = [
+    { key: 'cost_center', header: 'Centro de custo', cell: (row) => row.cost_center },
+    { key: 'realized_net', header: 'Resultado realizado', align: 'right', cell: (row) => formatCurrency(row.realized_net) },
+    { key: 'projected_net', header: 'Resultado projetado', align: 'right', cell: (row) => formatCurrency(row.projected_net) },
+    { key: 'expected_final_balance', header: 'Saldo final esperado', align: 'right', cell: (row) => formatCurrency(row.expected_final_balance) },
+  ]
+
+  const exportParams = {
+    from: from || undefined,
+    to: to || undefined,
+    days,
+    cost_center_id: costCenterId || undefined,
   }
 
   return (
@@ -401,20 +806,37 @@ function CashFlowSection() {
               { value: '90', label: '90 dias' },
             ]}
           />
-          <Select
-            aria-label="Centro de custo"
-            className="w-52"
-            value={costCenterId}
-            onChange={(e) => setCostCenterId(e.target.value)}
-            options={[{ value: '', label: 'Todos os centros' }, ...(costCenters.data ?? [])]}
-          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
           {query.data && (
-            <Can permission={Permission.REPORTS_EXPORT}>
-              <Button variant="secondary" onClick={() => downloadCsv(query.data!)}>
-                <Download className="size-4" />
-                Exportar CSV
-              </Button>
-            </Can>
+            <>
+              <ReportViewButton onClick={() => setViewerOpen(true)} />
+              <ReportExportButtons
+                onExportXlsx={() => reportsService.cashFlowExport(exportParams)}
+                onExportPdf={() =>
+                  printHtmlReport(
+                    'Demonstrativo de fluxo de caixa',
+                    buildReportHtml({
+                      title: 'Demonstrativo de fluxo de caixa',
+                      subtitle: `Período: ${formatDate(query.data!.realized.from)} até ${formatDate(query.data!.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`,
+                      sections: cashFlowGroups.map((group) => ({
+                        title: group.cost_center,
+                        headers: ['Resultado realizado', 'Resultado projetado', 'Saldo final esperado'],
+                        rows: [[formatCurrency(group.realized_net), formatCurrency(group.projected_net), formatCurrency(group.expected_final_balance)]],
+                        amountColumns: [0, 1, 2],
+                        footer: { label: 'Saldo final esperado', value: formatCurrency(group.expected_final_balance) },
+                      })),
+                      summary: query.data
+                        ? [
+                            { label: 'Resultado realizado', value: formatCurrency(query.data.comparative.realized_net) },
+                            { label: 'Resultado projetado', value: formatCurrency(query.data.comparative.projected_net) },
+                            { label: 'Saldo final esperado', value: formatCurrency(query.data.comparative.expected_final_balance) },
+                          ]
+                        : undefined,
+                    }),
+                  )
+                }
+              />
+            </>
           )}
           </div>
         </div>
@@ -423,36 +845,47 @@ function CashFlowSection() {
           <Skeleton className="h-48" />
         ) : (
           query.data && (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Summary label="Resultado realizado" value={query.data.comparative.realized_net} />
-              <Summary label="Resultado projetado" value={query.data.comparative.projected_net} />
-              <Summary label="Saldo final esperado" value={query.data.comparative.expected_final_balance} />
-            </div>
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Summary label="Resultado realizado" value={query.data.comparative.realized_net} />
+                <Summary label="Resultado projetado" value={query.data.comparative.projected_net} />
+                <Summary label="Saldo final esperado" value={query.data.comparative.expected_final_balance} />
+              </div>
+              <DataTable
+                columns={cashFlowGroupColumns}
+                rows={cashFlowGroups}
+                rowKey={(row) => row.cost_center}
+                emptyState={<EmptyState icon={BarChart3} title="Sem centros de custo" />}
+              />
+            </>
           )
         )}
       </CardContent>
+
+      <ReportScreenViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        title="Demonstrativo de fluxo de caixa"
+        description={`Período: ${formatDate(query.data?.realized.from)} até ${formatDate(query.data?.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`}
+        columns={cashFlowGroupScreenColumns}
+        sections={cashFlowGroups.map((group) => ({
+          title: group.cost_center,
+          rows: [group],
+          footer: { label: 'Saldo final esperado', value: formatCurrency(group.expected_final_balance) },
+        }))}
+        summary={
+          query.data
+            ? [
+                { label: 'Resultado realizado', value: formatCurrency(query.data.comparative.realized_net) },
+                { label: 'Resultado projetado', value: formatCurrency(query.data.comparative.projected_net) },
+                { label: 'Saldo final esperado', value: formatCurrency(query.data.comparative.expected_final_balance) },
+              ]
+            : undefined
+        }
+        rowKey={(row) => row.cost_center}
+      />
     </Card>
   )
-}
-
-interface CostCenterGroup {
-  costCenter: string
-  accounts: PayableAccount[]
-}
-
-function groupByCostCenter(accounts: PayableAccount[]): CostCenterGroup[] {
-  const map = new Map<string, PayableAccount[]>()
-
-  for (const account of accounts) {
-    const key = account.cost_center ?? 'Sem centro de custo'
-    const list = map.get(key) ?? []
-    list.push(account)
-    map.set(key, list)
-  }
-
-  return Array.from(map.entries())
-    .map(([costCenter, items]) => ({ costCenter, accounts: items }))
-    .sort((a, b) => a.costCenter.localeCompare(b.costCenter, 'pt-BR'))
 }
 
 function PayablesSection() {
@@ -460,8 +893,8 @@ function PayablesSection() {
   const [to, setTo] = useState('')
   const [costCenterId, setCostCenterId] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [reportOpen, setReportOpen] = useState(false)
-  const costCenters = useCostCenterOptions()
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const costCenterLabel = useCostCenterLabel(costCenterId)
 
   const query = usePayablesReport({
     from: from || undefined,
@@ -469,8 +902,9 @@ function PayablesSection() {
     cost_center_id: costCenterId || undefined,
   })
 
-  const accounts = query.data?.accounts ?? []
-  const groups = groupByCostCenter(accounts)
+  const data = query.data
+  const accounts = data?.accounts ?? []
+  const groups = data?.groups ?? []
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -484,41 +918,51 @@ function PayablesSection() {
     })
   }
 
-  const allSelected = accounts.length > 0 && accounts.every((a) => selected.has(a.id))
+  const allSelected = accounts.length > 0 && accounts.every((account) => selected.has(account.id))
 
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(accounts.map((a) => a.id)))
+    setSelected(allSelected ? new Set() : new Set(accounts.map((account) => account.id)))
   }
 
-  const overdueAccounts = accounts.filter((a) => a.is_overdue)
-  const nonOverdueAccounts = accounts.filter((a) => !a.is_overdue)
-  const selectedAccounts = nonOverdueAccounts.filter((a) => selected.has(a.id))
-  const remainingAccounts = nonOverdueAccounts.filter((a) => !selected.has(a.id))
-  const totalOverdue = overdueAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
-  const totalSelected = selectedAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
-  const totalRemaining = remainingAccounts.reduce((sum, a) => sum + a.remaining_amount, 0)
-  const totalAnalyzed = accounts.reduce((sum, a) => sum + a.remaining_amount, 0)
+  const overdueAccounts = accounts.filter((account) => account.is_overdue)
+  const selectedAccounts = accounts.filter((account) => selected.has(account.id))
+  const remainingAccounts = accounts.filter((account) => !selected.has(account.id))
+  const overdueRemainingAccounts = overdueAccounts.filter((account) => !selected.has(account.id))
+  const totalOverdue = overdueRemainingAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
+  const totalPaidToday = selectedAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
+  const totalRemaining = remainingAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
+  const totalAnalyzed = accounts.reduce((sum, account) => sum + account.remaining_amount, 0)
 
-  const reportGroups = groups.map((group) => ({
-    costCenter: group.costCenter,
-    overdue: group.accounts.filter((a) => a.is_overdue),
-    others: group.accounts.filter((a) => !a.is_overdue),
-  }))
+  const exportParams = {
+    from: from || undefined,
+    to: to || undefined,
+    cost_center_id: costCenterId || undefined,
+    selected_ids: Array.from(selected).join(','),
+  }
 
-  const costCenterLabel = costCenterId
-    ? (costCenters.data?.find((c) => c.value === costCenterId)?.label ?? query.data?.cost_center ?? '')
-    : 'Todos os centros de custo'
+  const exportSubtitle = data
+    ? `Referência: ${formatShortDate(data.reference_date)} · Período: ${formatShortDate(data.from)} até ${formatShortDate(data.to)} · ${costCenterLabel}`
+    : costCenterLabel
 
-  const columnsFor = (group: CostCenterGroup, index: number): Array<Column<PayableAccount>> => {
-    const allInGroupSelected = group.accounts.every((a) => selected.has(a.id))
+  const exportPayablesPdf = () => {
+    if (!data) return
+
+    const exportData = buildPayablesExportReport(data, selected)
+    printHtmlReport('Relatório de contas a pagar', buildPayablesReportHtml(exportData, 'Relatório de contas a pagar', exportSubtitle))
+  }
+
+  const exportViewData = data ? buildPayablesExportReport(data, selected) : null
+
+  const columnsFor = (group: (typeof groups)[number], index: number): Array<Column<PayableAccount>> => {
+    const allInGroupSelected = group.accounts.length > 0 && group.accounts.every((account) => selected.has(account.id))
 
     const toggleGroup = () => {
       setSelected((prev) => {
         const next = new Set(prev)
         if (allInGroupSelected) {
-          group.accounts.forEach((a) => next.delete(a.id))
+          group.accounts.forEach((account) => next.delete(account.id))
         } else {
-          group.accounts.forEach((a) => next.add(a.id))
+          group.accounts.forEach((account) => next.add(account.id))
         }
         return next
       })
@@ -532,148 +976,53 @@ function PayablesSection() {
             id={`payables-select-all-${index}`}
             checked={allInGroupSelected}
             onChange={toggleGroup}
-            aria-label={`Selecionar todas de ${group.costCenter}`}
+            aria-label={`Selecionar pagamentos de ${group.cost_center}`}
           />
         ),
-        render: (a) => (
+        render: (account) => (
           <Checkbox
-            id={`payables-${a.id}`}
-            checked={selected.has(a.id)}
-            onChange={() => toggle(a.id)}
-            aria-label={`Selecionar ${a.description}`}
+            id={`payables-${account.id}`}
+            checked={selected.has(account.id)}
+            onChange={() => toggle(account.id)}
+            aria-label={`Selecionar ${account.description}`}
           />
         ),
       },
       {
         key: 'due_date',
         header: 'Vencimento',
-        render: (a) => (
-          <span className={a.is_overdue ? 'font-medium text-danger' : 'text-muted'}>{formatDate(a.due_date)}</span>
+        render: (account) => (
+          <span className={account.is_overdue ? 'font-medium text-danger' : account.is_due_today ? 'font-medium text-success' : 'text-muted'}>
+            {formatShortDate(account.due_date)}
+          </span>
         ),
       },
       {
         key: 'description',
         header: 'Descrição',
-        render: (a) => (
-          <div className="min-w-0">
-            <p className="truncate font-medium text-foreground">{a.description}</p>
-            {a.counterparty && <p className="truncate text-[13px] text-muted">{a.counterparty}</p>}
-          </div>
+        render: (account) => (
+          <span className="whitespace-nowrap font-medium text-foreground">{account.description}</span>
         ),
       },
       {
         key: 'category',
         header: 'Categoria',
-        render: (a) => <span className="text-muted">{a.category ?? '—'}</span>,
+        render: (account) => <span className="whitespace-nowrap text-muted">{account.category ?? '—'}</span>,
       },
       {
         key: 'installment',
         header: 'Parcela',
-        render: (a) => (a.installment ? <Badge variant="neutral">{a.installment}</Badge> : <span className="text-muted">—</span>),
+        render: (account) =>
+          account.installment ? <Badge variant="neutral">{account.installment}</Badge> : <span className="text-muted">—</span>,
       },
       {
         key: 'value',
         header: 'Valor',
-        render: (a) => <span className="font-medium text-foreground">{formatCurrency(a.remaining_amount)}</span>,
+        render: (account) => (
+          <span className="whitespace-nowrap font-medium text-foreground">{formatCurrency(account.remaining_amount)}</span>
+        ),
       },
     ]
-  }
-
-  const exportCsv = () => {
-    const lines: string[] = [
-      ['Seção', 'Vencimento', 'Descrição', 'Categoria', 'Valor', 'Centro de custo'].join(';'),
-    ]
-
-    const byCostCenter = (a: PayableAccount, b: PayableAccount) =>
-      (a.cost_center ?? '').localeCompare(b.cost_center ?? '', 'pt-BR') || a.due_date.localeCompare(b.due_date)
-
-    for (const a of [...overdueAccounts].sort(byCostCenter)) {
-      lines.push(['Em atraso', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
-    }
-    for (const a of [...selectedAccounts].sort(byCostCenter)) {
-      lines.push(['A pagar hoje', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
-    }
-    for (const a of [...remainingAccounts].sort(byCostCenter)) {
-      lines.push(['Em aberto', a.due_date, a.description, a.category ?? '', a.remaining_amount.toFixed(2), a.cost_center ?? ''].join(';'))
-    }
-
-    lines.push('')
-    lines.push(['Total em atraso', '', '', '', totalOverdue.toFixed(2), ''].join(';'))
-    lines.push(['Total a pagar hoje', '', '', '', totalSelected.toFixed(2), ''].join(';'))
-    lines.push(['Total em aberto', '', '', '', totalRemaining.toFixed(2), ''].join(';'))
-    lines.push(['Valor geral analisado', '', '', '', totalAnalyzed.toFixed(2), ''].join(';'))
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'contas-a-pagar.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const printReport = () => {
-    const esc = (value: unknown) =>
-      String(value ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
-
-    const accountRow = (a: PayableAccount, marked: boolean) =>
-      `<tr><td${a.is_overdue ? ' style="color:#dc2626"' : ''}>${esc(a.due_date)}</td><td>${marked ? '✓ ' : ''}${esc(a.description)}</td><td>${esc(a.category ?? '—')}</td><td style="text-align:right">${esc(formatCurrency(a.remaining_amount))}</td></tr>`
-
-    const reportRows = reportGroups
-      .map((group) => {
-        const overdue = group.overdue.length
-          ? `<tr class="overdue"><td colspan="4">Em atraso</td></tr>
-          ${group.overdue.map((a) => accountRow(a, false)).join('')}`
-          : ''
-
-        const others = group.others.map((a) => accountRow(a, selected.has(a.id))).join('')
-
-        return `<tr class="cc"><td colspan="4">${esc(group.costCenter)}</td></tr>${overdue}${others}`
-      })
-      .join('')
-
-    const html = `<!doctype html>
-      <html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de contas a pagar</title>
-      <style>
-        body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
-        h1 { font-size: 20px; margin-bottom: 4px; }
-        h2 { font-size: 15px; margin: 0 0 16px; font-weight: normal; color: #444; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-        th { background: #f3f3f3; }
-        .cc td { background: #fafafa; font-weight: bold; }
-        .overdue td { color: #dc2626; font-weight: bold; }
-        .grand-total { margin-top: 24px; font-size: 13px; border-top: 2px solid #111; padding-top: 12px; }
-        .grand-total h3 { margin: 0 0 8px; }
-        .grand-total p { margin: 2px 0; }
-        .grand-total strong { font-size: 14px; }
-      </style></head><body>
-        <h1>Relatório de contas a pagar</h1>
-        <h2>Período: ${esc(formatDate(query.data?.from))} até ${esc(formatDate(query.data?.to))} · ${esc(costCenterLabel)}</h2>
-        <table>
-          <thead><tr><th>Vencimento</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
-          <tbody>
-            ${reportRows}
-          </tbody>
-        </table>
-        <div class="grand-total">
-          <h3>Resumo geral</h3>
-          <p>Qtd. contas em atraso: <strong>${overdueAccounts.length}</strong> — Valor em atraso: <strong>${esc(formatCurrency(totalOverdue))}</strong></p>
-          <p>Qtd. contas selecionadas: <strong>${selectedAccounts.length}</strong> — Valor selecionado: <strong>${esc(formatCurrency(totalSelected))}</strong></p>
-          <p>Qtd. contas em aberto: <strong>${remainingAccounts.length}</strong> — Valor em aberto: <strong>${esc(formatCurrency(totalRemaining))}</strong></p>
-          <p>Valor geral analisado: <strong>${esc(formatCurrency(totalAnalyzed))}</strong></p>
-        </div>
-      </body></html>`
-
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) return
-    win.document.open()
-    win.document.write(html)
-    win.document.close()
-
-    win.focus()
-    win.addEventListener('afterprint', () => win.close())
-    win.print()
   }
 
   return (
@@ -688,22 +1037,16 @@ function PayablesSection() {
               setTo(nextTo)
             }}
           />
-          <Select
-            aria-label="Centro de custo"
-            className="w-52"
-            value={costCenterId}
-            onChange={(e) => setCostCenterId(e.target.value)}
-            options={[{ value: '', label: 'Todos os centros' }, ...(costCenters.data ?? [])]}
-          />
+          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
         </div>
 
         {query.isPending ? (
           <Skeleton className="h-48" />
-        ) : (
+        ) : data ? (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Summary label="Em atraso" value={totalOverdue} accent="text-danger" />
-              <Summary label="Selecionadas p/ pagamento" value={totalSelected} accent="text-success" />
+              <Summary label="Total em atraso" value={totalOverdue} accent="text-danger" />
+              <Summary label="Total pago hoje" value={totalPaidToday} accent="text-success" />
               <Summary label="Permanecerão em aberto" value={totalRemaining} />
               <Summary label="Valor geral analisado" value={totalAnalyzed} />
             </div>
@@ -717,147 +1060,52 @@ function PayablesSection() {
                     {allSelected ? 'Limpar seleção' : 'Selecionar todas'}
                   </Button>
                   <span className="text-[13px] text-muted">
-                    {selected.size} de {accounts.length} selecionadas
+                    {selected.size} conta(s) selecionada(s) para pagamento hoje
                   </span>
                 </div>
+
                 {groups.map((group, index) => (
-                  <div key={group.costCenter}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-foreground">{group.costCenter}</h3>
-                      <span className="text-[13px] font-medium text-foreground">
-                        {formatCurrency(group.accounts.reduce((sum, a) => sum + a.remaining_amount, 0))}
-                      </span>
+                  <div key={group.cost_center}>
+                    <ReportGroupHeader
+                      title={group.cost_center}
+                      subtitle={`Em atraso: ${formatCurrency(
+                        group.accounts
+                          .filter((account) => account.is_overdue && !selected.has(account.id))
+                          .reduce((sum, account) => sum + account.remaining_amount, 0),
+                      )} · Selecionado p/ hoje: ${formatCurrency(
+                        group.accounts
+                          .filter((account) => selected.has(account.id))
+                          .reduce((sum, account) => sum + account.remaining_amount, 0),
+                      )}`}
+                    />
+                    <div className="overflow-x-auto">
+                      <DataTable columns={columnsFor(group, index)} rows={group.accounts} rowKey={(account) => account.id} />
                     </div>
-                    <DataTable columns={columnsFor(group, index)} rows={group.accounts} rowKey={(a) => a.id} />
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="flex justify-end">
-              <Can permission={Permission.REPORTS_EXPORT}>
-                <Button onClick={() => setReportOpen(true)}>
-                  <ClipboardList className="size-4" />
-                  Gerar relatório
-                </Button>
-              </Can>
+            <div className="flex flex-wrap justify-end gap-2">
+              <PayablesViewButton onClick={() => setViewerOpen(true)} disabled={accounts.length === 0} />
+              <ReportExportButtons
+                disabled={accounts.length === 0}
+                onExportXlsx={() => reportsService.payablesExport(exportParams)}
+                onExportPdf={exportPayablesPdf}
+              />
             </div>
           </>
-        )}
+        ) : null}
       </CardContent>
 
-      <Modal
-        open={reportOpen}
-        onClose={() => setReportOpen(false)}
-        title="Relatório de contas a pagar"
-        description={`Período: ${formatDate(query.data?.from)} até ${formatDate(query.data?.to)} · ${costCenterLabel}`}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setReportOpen(false)}>
-              Fechar
-            </Button>
-            <Can permission={Permission.REPORTS_EXPORT}>
-              <Button variant="secondary" onClick={exportCsv}>
-                <Download className="size-4" />
-                Exportar CSV
-              </Button>
-              <Button onClick={printReport}>
-                <Printer className="size-4" />
-                Imprimir
-              </Button>
-            </Can>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="bg-surface-2/60 text-left text-xs tracking-wide text-muted uppercase">
-                    <th className="px-4 py-2.5 font-medium">Vencimento</th>
-                    <th className="px-4 py-2.5 font-medium">Descrição</th>
-                    <th className="px-4 py-2.5 font-medium">Categoria</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportGroups.map((group) => (
-                    <Fragment key={group.costCenter}>
-                      <tr>
-                        <td colSpan={4} className="px-4 pt-3 pb-1 text-[13px] font-semibold text-foreground">
-                          {group.costCenter}
-                        </td>
-                      </tr>
-                      {group.overdue.length > 0 && (
-                        <>
-                          <tr>
-                            <td colSpan={4} className="px-4 py-1.5 text-[13px] font-medium text-danger">
-                              Em atraso
-                            </td>
-                          </tr>
-                          {group.overdue.map((a) => (
-                            <tr key={a.id}>
-                              <td className="px-4 py-1.5 text-danger">{formatDate(a.due_date)}</td>
-                              <td className="px-4 py-1.5">{a.description}</td>
-                              <td className="px-4 py-1.5 text-muted">{a.category ?? '—'}</td>
-                              <td className="px-4 py-1.5 text-right font-medium">{formatCurrency(a.remaining_amount)}</td>
-                            </tr>
-                          ))}
-                        </>
-                      )}
-                      {group.others.map((a) => (
-                        <tr key={a.id}>
-                          <td className="px-4 py-1.5 text-muted">{formatDate(a.due_date)}</td>
-                          <td className="px-4 py-1.5">
-                            {selected.has(a.id) && <Check className="mr-1.5 inline size-3.5 text-success" />}
-                            {a.description}
-                          </td>
-                          <td className="px-4 py-1.5 text-muted">{a.category ?? '—'}</td>
-                          <td className="px-4 py-1.5 text-right font-medium">{formatCurrency(a.remaining_amount)}</td>
-                        </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          <div className="rounded-xl bg-surface-2/60 p-4 text-sm">
-            <h3 className="mb-2 text-sm font-semibold text-foreground">Resumo geral</h3>
-            <div className="flex items-center justify-between">
-              <span className="text-muted">Contas em atraso</span>
-              <span className="font-medium text-foreground">{overdueAccounts.length}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-muted">Valor em atraso</span>
-              <span className="font-medium text-danger">{formatCurrency(totalOverdue)}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-muted">Contas selecionadas</span>
-              <span className="font-medium text-foreground">{selectedAccounts.length}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-muted">Valor selecionado</span>
-              <span className="font-medium text-foreground">{formatCurrency(totalSelected)}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-muted">Contas em aberto</span>
-              <span className="font-medium text-foreground">{remainingAccounts.length}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-muted">Valor em aberto</span>
-              <span className="font-medium text-foreground">{formatCurrency(totalRemaining)}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between border-t border-surface-3 pt-2">
-              <span className="font-semibold text-foreground">Valor geral analisado</span>
-              <span className="text-lg font-semibold text-foreground">{formatCurrency(totalAnalyzed)}</span>
-            </div>
-          </div>
-        </div>
-      </Modal>
+      {exportViewData && (
+        <PayablesReportViewer
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          data={exportViewData}
+          costCenterLabel={costCenterLabel}
+        />
+      )}
     </Card>
   )
 }
@@ -867,6 +1115,55 @@ function Summary({ label, value, accent = 'text-foreground' }: { label: string; 
     <div className="rounded-xl bg-surface-2/60 p-4">
       <p className="text-[13px] text-muted">{label}</p>
       <p className={`text-lg font-semibold ${accent}`}>{formatCurrency(value)}</p>
+    </div>
+  )
+}
+
+function DailyCostCenterBlock({ group }: { group: DailyCostCenterGroup }) {
+  type MovementRow = DailyCostCenterGroup['payments'][number]
+
+  const columns: Array<Column<MovementRow>> = [
+    { key: 'description', header: 'Descrição', render: (row) => <span className="font-medium text-foreground">{row.description}</span> },
+    { key: 'category', header: 'Categoria', render: (row) => <span className="text-muted">{row.category ?? '—'}</span> },
+    {
+      key: 'value',
+      header: 'Valor',
+      render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.value)}</span>,
+    },
+  ]
+
+  return (
+    <div>
+      <ReportGroupHeader
+        title={group.cost_center}
+        total={group.balance}
+        subtitle={`Pago: ${formatCurrency(group.total_paid)} · Recebido: ${formatCurrency(group.total_received)}`}
+      />
+      <div className="space-y-4">
+        {group.payments.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-[13px] font-semibold text-danger">Pagamentos</h4>
+            <DataTable columns={columns} rows={group.payments} rowKey={(row) => `${row.description}-${row.category}-${row.value}`} />
+            <p className="mt-1 text-right text-[13px] font-medium text-foreground">Total pago: {formatCurrency(group.total_paid)}</p>
+          </div>
+        )}
+        {group.receipts.length > 0 && (
+          <div>
+            <h4 className="mb-2 text-[13px] font-semibold text-success">Recebimentos</h4>
+            <DataTable columns={columns} rows={group.receipts} rowKey={(row) => `${row.description}-${row.category}-${row.value}`} />
+            <p className="mt-1 text-right text-[13px] font-medium text-foreground">Total recebido: {formatCurrency(group.total_received)}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CategoryCostCenterBlock({ group }: { group: CategoryCostCenterGroup }) {
+  return (
+    <div>
+      <ReportGroupHeader title={group.cost_center} subtitle={`Despesas: ${formatCurrency(group.total_expense)}`} />
+      <CategoryColumn title="Despesas" rows={group.expense} accent="text-danger" />
     </div>
   )
 }
@@ -887,27 +1184,6 @@ function CategoryColumn({ title, rows, accent }: { title: string; rows: Array<{ 
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-function MovementsList({ title, items }: { title: string; items: Array<{ description: string; cost_center: string | null; value: number }> }) {
-  if (items.length === 0) return null
-
-  return (
-    <div>
-      <h3 className="mb-2 text-sm font-semibold text-foreground">{title}</h3>
-      <div className="space-y-1.5">
-        {items.map((item, i) => (
-          <div key={i} className="flex items-center justify-between rounded-lg bg-surface-2/60 px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm text-foreground">{item.description}</p>
-              <p className="truncate text-[13px] text-muted">{item.cost_center ?? '—'}</p>
-            </div>
-            <span className="text-sm font-medium text-foreground">{formatCurrency(item.value)}</span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

@@ -110,13 +110,21 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function (): void {
 
     // Relatórios
     Route::get('reports/daily', [ReportController::class, 'daily'])->middleware('permission:reports.view');
+    Route::get('reports/daily/export', [ReportController::class, 'dailyExport'])->middleware('permission:reports.export');
     Route::get('reports/weekly', [ReportController::class, 'weekly'])->middleware('permission:reports.view');
+    Route::get('reports/weekly/export', [ReportController::class, 'weeklyExport'])->middleware('permission:reports.export');
     Route::get('reports/provision', [ReportController::class, 'provision'])->middleware('permission:reports.view');
     Route::get('reports/provision/export', [ReportController::class, 'provisionExport'])->middleware('permission:reports.export');
     Route::get('reports/by-category', [ReportController::class, 'byCategory'])->middleware('permission:reports.view');
+    Route::get('reports/by-category/export', [ReportController::class, 'byCategoryExport'])->middleware('permission:reports.export');
+    Route::get('reports/monthly-summary', [ReportController::class, 'monthlySummary'])->middleware('permission:reports.view');
+    Route::get('reports/monthly-summary/export', [ReportController::class, 'monthlySummaryExport'])->middleware('permission:reports.export');
     Route::get('reports/by-cost-center', [ReportController::class, 'byCostCenter'])->middleware('permission:reports.view');
+    Route::get('reports/by-cost-center/export', [ReportController::class, 'byCostCenterExport'])->middleware('permission:reports.export');
     Route::get('reports/cash-flow', [ReportController::class, 'cashFlow'])->middleware('permission:reports.view');
+    Route::get('reports/cash-flow/export', [ReportController::class, 'cashFlowExport'])->middleware('permission:reports.export');
     Route::get('reports/payables', [ReportController::class, 'payables'])->middleware('permission:reports.view');
+    Route::get('reports/payables/export', [ReportController::class, 'payablesExport'])->middleware('permission:reports.export');
 
     // Auditoria
     Route::get('audit', [AuditLogController::class, 'index'])->middleware('permission:audit.view');
