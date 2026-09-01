@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Lock, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import {
-  Badge,
   Button,
   ButtonLink,
   ConfirmDialog,
@@ -52,19 +51,6 @@ export default function RolesListPage() {
       ),
     },
     {
-      key: 'type',
-      header: 'Tipo',
-      render: (role) =>
-        role.is_default ? (
-          <Badge variant="primary">
-            <Lock className="size-3" aria-hidden="true" />
-            Sistema
-          </Badge>
-        ) : (
-          <Badge>Personalizado</Badge>
-        ),
-    },
-    {
       key: 'permissions',
       header: 'Permissões',
       render: (role) => (
@@ -79,32 +65,31 @@ export default function RolesListPage() {
             key: 'actions',
             header: <span className="sr-only">Ações</span>,
             className: 'w-24 text-right',
-            render: (role: Role) =>
-              role.is_default ? null : (
-                <div className="flex items-center justify-end gap-1">
-                  {can(Permission.ROLE_UPDATE) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/roles/${role.id}/edit`)}
-                      aria-label={`Editar ${role.name}`}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                  )}
-                  {can(Permission.ROLE_DELETE) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setRoleToDelete(role)}
-                      aria-label={`Excluir ${role.name}`}
-                      className="text-danger hover:bg-danger-soft hover:text-danger"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ),
+            render: (role: Role) => (
+              <div className="flex items-center justify-end gap-1">
+                {can(Permission.ROLE_UPDATE) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/roles/${role.id}/edit`)}
+                    aria-label={`Editar ${role.name}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                )}
+                {can(Permission.ROLE_DELETE) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRoleToDelete(role)}
+                    aria-label={`Excluir ${role.name}`}
+                    className="text-danger hover:bg-danger-soft hover:text-danger"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
+              </div>
+            ),
           } satisfies Column<Role>,
         ]
       : []),

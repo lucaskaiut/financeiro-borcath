@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\User;
 
+use App\Modules\ACL\Enums\DefaultRole;
 use App\Modules\User\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -60,21 +61,48 @@ class UserCrudTest extends TestCase
 
         Sanctum::actingAs($this->createAdmin($tenant));
 
+        $consultaRoleId = $this->roleFor($tenant, DefaultRole::CONSULTA)->getKey();
+
         $this->postJson('/api/users', [
             'name' => 'Novo Usuário',
             'email' => 'novo@empresa.com',
             'phone' => '41988887777',
             'document' => '529.982.247-25',
             'password' => '12345678',
+            'role_ids' => [$consultaRoleId],
         ])
             ->assertCreated()
             ->assertJsonPath('data.email', 'novo@empresa.com')
-            ->assertJsonPath('data.document', '52998224725');
+            ->assertJsonPath('data.document', '52998224725')
+            ->assertJsonPath('data.roles.0.name', DefaultRole::CONSULTA->value);
 
         $this->assertDatabaseHas('users', [
             'email' => 'novo@empresa.com',
             'tenant_id' => $tenant->getKey(),
         ]);
+    }
+
+    public function test_store_requires_at_least_one_role_from_current_tenant(): void
+    {
+        $tenantA = $this->createTenantWithRoles();
+        $tenantB = $this->createTenantWithRoles(['domain' => 'outro.com.br']);
+
+        Sanctum::actingAs($this->createAdmin($tenantA));
+
+        $foreignRoleId = $this->roleFor($tenantB, DefaultRole::CONSULTA)->getKey();
+
+        $this->postJson('/api/users', [
+            'name' => 'Novo Usuário',
+            'email' => 'novo@empresa.com',
+            'password' => '12345678',
+            'role_ids' => [$foreignRoleId],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['role_ids.0']);
+
+        $this->postJson('/api/users', [
+            'name' => 'Novo Usuário',
+            'email' => 'novo@empresa.com',
+            'password' => '12345678',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['role_ids']);
     }
 
     public function test_store_validates_email_uniqueness_and_cpf(): void
@@ -88,6 +116,7 @@ class UserCrudTest extends TestCase
             'name' => 'X',
             'email' => 'admin@empresa.com',
             'password' => '12345678',
+            'role_ids' => [$this->roleFor($tenant, DefaultRole::CONSULTA)->getKey()],
         ])->assertUnprocessable()->assertJsonValidationErrors(['email']);
 
         $this->postJson('/api/users', [
@@ -95,21 +124,37 @@ class UserCrudTest extends TestCase
             'email' => 'x@empresa.com',
             'document' => '123',
             'password' => '12345678',
+            'role_ids' => [$this->roleFor($tenant, DefaultRole::CONSULTA)->getKey()],
         ])->assertUnprocessable()->assertJsonValidationErrors(['document']);
     }
 
-    public function test_update_changes_user_data(): void
+    public function test_update_changes_user_data_and_roles(): void
     {
         $tenant = $this->createTenantWithRoles();
         $user = User::factory()->for($tenant)->create();
+        $user->assignRole($this->roleFor($tenant, DefaultRole::CONSULTA));
 
         Sanctum::actingAs($this->createAdmin($tenant));
 
-        $this->putJson("/api/users/{$user->uuid}", ['name' => 'Renomeado'])
+        $financeiroRoleId = $this->roleFor($tenant, DefaultRole::FINANCEIRO)->getKey();
+
+        $this->putJson("/api/users/{$user->uuid}", [
+            'name' => 'Renomeado',
+            'role_ids' => [$financeiroRoleId],
+        ])
             ->assertOk()
-            ->assertJsonPath('data.name', 'Renomeado');
+            ->assertJsonPath('data.name', 'Renomeado')
+            ->assertJsonPath('data.roles.0.name', DefaultRole::FINANCEIRO->value);
 
         $this->assertDatabaseHas('users', ['id' => $user->getKey(), 'name' => 'Renomeado']);
+        $this->assertDatabaseHas('user_roles', [
+            'user_id' => $user->getKey(),
+            'role_id' => $financeiroRoleId,
+        ]);
+        $this->assertDatabaseMissing('user_roles', [
+            'user_id' => $user->getKey(),
+            'role_id' => $this->roleFor($tenant, DefaultRole::CONSULTA)->getKey(),
+        ]);
     }
 
     public function test_update_cannot_reach_users_of_other_tenants(): void

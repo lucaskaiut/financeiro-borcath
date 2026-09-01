@@ -20,7 +20,6 @@ class RoleResource extends JsonResource
             'id' => $this->getKey(),
             'name' => $this->name,
             'description' => $this->description,
-            'is_default' => $this->isDefault(),
             'permissions' => $this->whenLoaded(
                 'permissions',
                 fn () => $this->permissionValues(),

@@ -28,14 +28,12 @@ class RolePolicy
     public function update(User $user, Role $role): bool
     {
         return $this->sameTenant($role)
-            && ! $role->isDefault()
             && $user->hasPermission(Permission::ROLE_UPDATE);
     }
 
     public function delete(User $user, Role $role): bool
     {
         return $this->sameTenant($role)
-            && ! $role->isDefault()
             && $user->hasPermission(Permission::ROLE_DELETE);
     }
 

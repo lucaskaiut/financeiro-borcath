@@ -81,6 +81,7 @@ export default function UserEditPage() {
               document: query.data.document ?? '',
               password: '',
               password_confirmation: '',
+              role_ids: query.data.roles?.map((role) => role.id) ?? [],
             }}
             submitting={updateUser.isPending}
             onSubmit={async (payload) => {

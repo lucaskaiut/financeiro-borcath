@@ -4,6 +4,7 @@ import { Button, ButtonLink, Card, CardContent, Form, Section, TextField } from 
 import { isApiError } from '@/shared/api/errors'
 import { applyApiErrorsToForm } from '@/shared/utils/forms'
 import { onlyDigits } from '@/shared/utils/document'
+import { RolesField } from '../components/RolesField'
 import type { UserPayload } from '../services/users.service'
 import { createUserSchema, updateUserSchema, type UserFormValues } from '../schemas/user.schema'
 
@@ -24,6 +25,7 @@ export function UserForm({ mode, defaultValues, submitting, onSubmit }: UserForm
       document: '',
       password: '',
       password_confirmation: '',
+      role_ids: [],
       ...defaultValues,
     },
   })
@@ -34,6 +36,7 @@ export function UserForm({ mode, defaultValues, submitting, onSubmit }: UserForm
       email: values.email,
       phone: values.phone || null,
       document: values.document ? onlyDigits(values.document) : null,
+      role_ids: values.role_ids,
     }
 
     if (values.password) {
@@ -60,6 +63,13 @@ export function UserForm({ mode, defaultValues, submitting, onSubmit }: UserForm
               <TextField name="phone" label="Telefone" placeholder="(41) 99999-9999" />
               <TextField name="document" label="CPF" placeholder="Somente números" />
             </div>
+          </Section>
+
+          <Section
+            title="Perfis de acesso"
+            description="Selecione um ou mais perfis para definir o que este usuário pode fazer no sistema."
+          >
+            <RolesField />
           </Section>
 
           <Section

@@ -1,7 +1,6 @@
 import { useNavigate, useParams } from 'react-router'
 import { ShieldX } from 'lucide-react'
 import {
-  Alert,
   ButtonLink,
   Card,
   CardContent,
@@ -67,13 +66,7 @@ export default function RoleEditPage() {
           </Card>
         )}
 
-        {query.data && query.data.is_default && (
-          <Alert variant="warning" title="Perfil de sistema">
-            Perfis padrão não podem ser modificados.
-          </Alert>
-        )}
-
-        {query.data && !query.data.is_default && (
+        {query.data && (
           <RoleForm
             mode="edit"
             defaultValues={{

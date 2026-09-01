@@ -23,11 +23,15 @@ class UserService
     }
 
     /**
-     * @param  array{name: string, email: string, phone: ?string, document: ?string, password: string}  $data
+     * @param  array{name: string, email: string, phone: ?string, document: ?string, password: string, role_ids: list<int>}  $data
      */
     public function create(array $data): User
     {
+        $roleIds = $data['role_ids'];
+        unset($data['role_ids']);
+
         $user = User::query()->create($data);
+        $user->syncRoles($roleIds);
 
         return $user->load('roles.permissions');
     }
@@ -47,6 +51,11 @@ class UserService
     {
         if (blank($data['password'] ?? null)) {
             unset($data['password']);
+        }
+
+        if (array_key_exists('role_ids', $data)) {
+            $user->syncRoles($data['role_ids']);
+            unset($data['role_ids']);
         }
 
         $user->fill($data);

@@ -3,6 +3,7 @@
 namespace App\Modules\User\Http\Requests;
 
 use App\Modules\Shared\Rules\Cpf;
+use App\Modules\Tenant\Support\Facades\TenantContext;
 use App\Modules\User\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,6 +31,11 @@ class UpdateUserRequest extends FormRequest
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'document' => ['sometimes', 'nullable', 'string', new Cpf],
             'password' => ['sometimes', 'nullable', 'string', 'min:8', 'max:255'],
+            'role_ids' => ['sometimes', 'required', 'array', 'min:1'],
+            'role_ids.*' => [
+                'integer',
+                Rule::exists('roles', 'id')->where(fn ($query) => $query->where('tenant_id', TenantContext::tenantId())),
+            ],
         ];
     }
 

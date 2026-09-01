@@ -6,6 +6,7 @@ const baseUserSchema = {
   email: z.string().min(1, 'Informe o e-mail').email('Informe um e-mail válido'),
   phone: z.string(),
   document: z.string().refine((value) => !value || isValidCpf(value), 'Informe um CPF válido'),
+  role_ids: z.array(z.number()).min(1, 'Selecione ao menos um perfil'),
 }
 
 export const createUserSchema = z

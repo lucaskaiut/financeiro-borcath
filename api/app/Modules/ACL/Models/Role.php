@@ -2,7 +2,6 @@
 
 namespace App\Modules\ACL\Models;
 
-use App\Modules\ACL\Enums\DefaultRole;
 use App\Modules\ACL\Enums\Permission;
 use App\Modules\Tenant\Models\Concerns\BelongsToTenant;
 use App\Modules\User\Models\User;
@@ -79,11 +78,6 @@ class Role extends Model
             ->pluck('permission')
             ->map(fn (Permission $permission) => $permission->value)
             ->values();
-    }
-
-    public function isDefault(): bool
-    {
-        return DefaultRole::tryFrom($this->name) !== null;
     }
 
     protected static function newFactory(): RoleFactory

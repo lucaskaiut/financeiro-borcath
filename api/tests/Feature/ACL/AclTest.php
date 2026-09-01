@@ -109,6 +109,7 @@ class AclTest extends TestCase
             'name' => 'Novo Usuário',
             'email' => 'novo@empresa.com',
             'password' => '12345678',
+            'role_ids' => [$this->roleFor($tenant, DefaultRole::CONSULTA)->getKey()],
         ])->assertCreated();
     }
 }

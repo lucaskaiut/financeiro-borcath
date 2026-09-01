@@ -99,7 +99,7 @@ export default function UsersListPage() {
         <div className="flex flex-wrap gap-1">
           {user.roles?.length ? (
             user.roles.map((role) => (
-              <Badge key={role.id} variant={role.is_default ? 'primary' : 'neutral'}>
+              <Badge key={role.id} variant="neutral">
                 {role.name}
               </Badge>
             ))

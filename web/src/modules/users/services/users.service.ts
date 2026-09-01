@@ -8,6 +8,7 @@ export interface UserPayload {
   phone?: string | null
   document?: string | null
   password?: string
+  role_ids: number[]
 }
 
 export const usersService = {

@@ -144,21 +144,23 @@ class RoleCrudTest extends TestCase
         $this->assertFalse($user->fresh()->hasPermission(Permission::USER_READ));
     }
 
-    public function test_default_roles_cannot_be_updated_or_deleted(): void
+    public function test_default_roles_can_be_updated_and_deleted(): void
     {
         $tenant = $this->createTenantWithRoles();
-        $adminRole = $this->roleFor($tenant, DefaultRole::ADMINISTRATOR);
-        $userRole = $this->roleFor($tenant, DefaultRole::CONSULTA);
+        $consultaRole = $this->roleFor($tenant, DefaultRole::CONSULTA);
 
         Sanctum::actingAs($this->createAdmin($tenant));
 
-        $this->putJson("/api/roles/{$adminRole->getKey()}", ['name' => 'Hackeado'])
-            ->assertForbidden();
+        $this->putJson("/api/roles/{$consultaRole->getKey()}", [
+            'name' => 'Consulta Renomeado',
+            'permissions' => [Permission::ACCOUNTS_VIEW->value],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Consulta Renomeado');
 
-        $this->deleteJson("/api/roles/{$userRole->getKey()}")->assertForbidden();
+        $this->deleteJson("/api/roles/{$consultaRole->getKey()}")->assertOk();
 
-        $this->assertDatabaseHas('roles', ['id' => $adminRole->getKey(), 'name' => DefaultRole::ADMINISTRATOR->value]);
-        $this->assertDatabaseHas('roles', ['id' => $userRole->getKey()]);
+        $this->assertDatabaseMissing('roles', ['id' => $consultaRole->getKey()]);
     }
 
     public function test_update_cannot_reach_roles_of_other_tenants(): void

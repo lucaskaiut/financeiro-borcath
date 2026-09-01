@@ -28,6 +28,15 @@ trait HasRoles
         $this->unsetRelation('roles');
     }
 
+    /**
+     * @param  list<int>  $roleIds
+     */
+    public function syncRoles(array $roleIds): void
+    {
+        $this->roles()->sync(array_values(array_unique(array_map('intval', $roleIds))));
+        $this->unsetRelation('roles');
+    }
+
     public function hasRole(Role|string $role): bool
     {
         $name = $role instanceof Role ? $role->name : $role;
