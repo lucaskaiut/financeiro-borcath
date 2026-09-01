@@ -138,11 +138,10 @@ export function AccountForm({ mode, defaultValues, submitting, hasSettlement = f
         <Form form={form} onSubmit={handleSubmit} className="space-y-8">
           <Section
             title="Tipo de lançamento"
-            description={hasSettlement ? 'O tipo não pode ser alterado após o registro de baixas.' : undefined}
+            description={hasSettlement ? 'Alterações refletem no fluxo de caixa realizado.' : undefined}
           >
             <RadioGroupField
               name="type"
-              disabled={hasSettlement}
               options={[
                 { value: 'payable', label: 'Conta a pagar' },
                 { value: 'receivable', label: 'Conta a receber' },

@@ -265,7 +265,7 @@ class FinanceTest extends TestCase
             ->assertJsonValidationErrors(['value']);
     }
 
-    public function test_settled_account_type_cannot_be_changed(): void
+    public function test_settled_account_type_change_reflects_in_cash_flow(): void
     {
         $tenant = $this->createTenantWithRoles();
         Sanctum::actingAs($this->createAdmin($tenant));
@@ -282,11 +282,25 @@ class FinanceTest extends TestCase
             'due_date' => '2026-07-01',
         ])->json('data.0.id');
 
-        $this->postJson("/api/accounts/{$accountId}/settle", ['value' => 500])->assertOk();
+        $this->postJson("/api/accounts/{$accountId}/settle", ['value' => 500, 'settled_at' => '2026-07-05'])->assertOk();
+
+        $realizedBefore = $this->getJson('/api/cash-flow/realized?from=2026-07-01&to=2026-07-31')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertEquals(500, $realizedBefore['total_out']);
+        $this->assertEquals(0, $realizedBefore['total_in']);
 
         $this->putJson("/api/accounts/{$accountId}", ['type' => 'receivable'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['type']);
+            ->assertOk()
+            ->assertJsonPath('data.type', 'receivable');
+
+        $realizedAfter = $this->getJson('/api/cash-flow/realized?from=2026-07-01&to=2026-07-31')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertEquals(0, $realizedAfter['total_out']);
+        $this->assertEquals(500, $realizedAfter['total_in']);
     }
 
     public function test_account_with_settlements_cannot_be_deleted(): void

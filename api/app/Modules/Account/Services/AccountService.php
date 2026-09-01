@@ -139,10 +139,6 @@ class AccountService
 
         $valueChanged = array_key_exists('value', $data);
 
-        if ($hasSettlements && array_key_exists('type', $data) && $data['type'] !== $account->type?->value) {
-            throw new AccountUpdateException('type', 'Não é possível alterar o tipo de lançamentos com baixas registradas.');
-        }
-
         $account->fill($data);
         $account->save();
 
