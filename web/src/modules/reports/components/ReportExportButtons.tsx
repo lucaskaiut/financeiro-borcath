@@ -5,7 +5,7 @@ import { Can } from '@/app/guards/PermissionGuard'
 import { Permission } from '@/shared/constants/permissions'
 
 interface ReportExportButtonsProps {
-  onExportXlsx: () => Promise<void>
+  onExportXlsx: () => void | Promise<void>
   onExportPdf: () => void
   disabled?: boolean
 }

@@ -87,8 +87,6 @@ function accountRow(account: PayableAccount): string {
   return `<tr>
     <td>${escapeHtml(formatShortDate(account.due_date))}</td>
     <td>${escapeHtml(account.description)}</td>
-    <td>${escapeHtml(account.counterparty ?? '—')}</td>
-    <td>${escapeHtml(account.category ?? '—')}</td>
     <td class="amount">${escapeHtml(formatCurrency(account.remaining_amount))}</td>
   </tr>`
 }
@@ -98,40 +96,38 @@ export function buildPayablesReportHtml(data: PayablesExportReport, title: strin
   const sections: string[] = []
 
   for (const group of data.groups) {
-    sections.push(`<tr class="section-banner"><td colspan="5">${escapeHtml(group.cost_center)}</td></tr>`)
+    sections.push(`<tr class="section-banner"><td colspan="3">${escapeHtml(group.cost_center)}</td></tr>`)
     sections.push(
       `<tr class="column-header">
         <th>Data</th>
         <th>Descrição</th>
-        <th>Fornecedor</th>
-        <th>Categoria</th>
         <th class="amount">Valor</th>
       </tr>`,
     )
 
     if (group.overdue.accounts.length > 0) {
-      sections.push(`<tr class="status-overdue"><td colspan="5">EM ATRASO</td></tr>`)
+      sections.push(`<tr class="status-overdue"><td colspan="3">EM ATRASO</td></tr>`)
       for (const account of group.overdue.accounts) {
         sections.push(accountRow(account))
       }
       sections.push(
-        `<tr class="total-overdue"><td colspan="4">TOTAL EM ATRASO</td><td class="amount">${escapeHtml(formatCurrency(group.overdue.total))}</td></tr>`,
+        `<tr class="total-overdue"><td colspan="2">TOTAL EM ATRASO</td><td class="amount">${escapeHtml(formatCurrency(group.overdue.total))}</td></tr>`,
       )
     }
 
     if (group.due_today.accounts.length > 0) {
       sections.push(
-        `<tr class="status-paid"><td colspan="5">PAGOS EM ${escapeHtml(referenceDate)}</td></tr>`,
+        `<tr class="status-paid"><td colspan="3">PAGOS EM ${escapeHtml(referenceDate)}</td></tr>`,
       )
       for (const account of group.due_today.accounts) {
         sections.push(accountRow(account))
       }
       sections.push(
-        `<tr class="total-paid"><td colspan="4">TOTAL PAGO</td><td class="amount">${escapeHtml(formatCurrency(group.due_today.total))}</td></tr>`,
+        `<tr class="total-paid"><td colspan="2">TOTAL PAGO</td><td class="amount">${escapeHtml(formatCurrency(group.due_today.total))}</td></tr>`,
       )
     }
 
-    sections.push('<tr class="spacer"><td colspan="5"></td></tr>')
+    sections.push('<tr class="spacer"><td colspan="3"></td></tr>')
   }
 
   const paidSummaryRows = data.summary.paid_today.rows

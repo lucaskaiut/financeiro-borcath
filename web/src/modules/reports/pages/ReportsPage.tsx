@@ -17,6 +17,8 @@ import { buildCategoryMatrixHtml } from '../utils/category-html-export'
 import { buildMonthlySummaryHtml } from '../utils/monthly-summary-html-export'
 import { useColumnTableState } from '../hooks/useColumnTableState'
 import { applyColumnTableState } from '../utils/column-table'
+import { applyColumnFiltersToCategoryMatrix } from '../utils/category-matrix-filter'
+import { downloadReportXlsx } from '../utils/client-xlsx-export'
 import {
   Badge,
   Button,
@@ -155,17 +157,33 @@ function DailySection() {
   ]
 
   const dailyGroups = (query.data?.groups ?? [])
-    .map((group) => ({
-      ...group,
-      payments: applyColumnTableState(group.payments, columnState, movementAccessors),
-      receipts: applyColumnTableState(group.receipts, columnState, movementAccessors),
-    }))
+    .map((group) => {
+      const payments = applyColumnTableState(group.payments, columnState, movementAccessors)
+      const receipts = applyColumnTableState(group.receipts, columnState, movementAccessors)
+      const total_paid = payments.reduce((sum, row) => sum + row.value, 0)
+      const total_received = receipts.reduce((sum, row) => sum + row.value, 0)
+
+      return {
+        ...group,
+        payments,
+        receipts,
+        total_paid,
+        total_received,
+        balance: total_received - total_paid,
+      }
+    })
     .filter((group) => group.payments.length > 0 || group.receipts.length > 0)
+
+  const filteredPaid = dailyGroups.reduce((sum, group) => sum + group.total_paid, 0)
+  const filteredReceived = dailyGroups.reduce((sum, group) => sum + group.total_received, 0)
+  const filteredBalance = filteredReceived - filteredPaid
 
   const movementHeaders = ['Descrição', 'Categoria', 'Valor']
   const movementRows = (items: MovementRow[]) =>
     items.map((item) => [item.description, item.category ?? '—', formatCurrency(item.value)])
-  const exportParams = { date, cost_center_id: costCenterId || undefined }
+  const movementXlsxRows = (items: MovementRow[]) =>
+    items.map((item) => [item.description, item.category ?? '—', item.value])
+  const subtitle = `Data: ${formatDate(date)} · ${costCenterLabel}`
 
   const dailyScreenSections = dailyGroups.flatMap((group) => {
     const sections = []
@@ -232,6 +250,49 @@ function DailySection() {
     return sections
   })
 
+  const exportDailyXlsx = () => {
+    downloadReportXlsx({
+      filename: 'relatorio-diario.xlsx',
+      title: 'Relatório diário',
+      subtitleLines: [subtitle],
+      tables: dailyGroups.flatMap((group) => {
+        const tables = []
+
+        if (group.payments.length > 0) {
+          tables.push({
+            banner: `${group.cost_center} · Pagamentos`,
+            headers: movementHeaders,
+            rows: movementXlsxRows(group.payments),
+            footer: ['Total pago', '', group.total_paid],
+          })
+        }
+
+        if (group.receipts.length > 0) {
+          tables.push({
+            banner: `${group.cost_center} · Recebimentos`,
+            headers: movementHeaders,
+            rows: movementXlsxRows(group.receipts),
+            footer: ['Total recebido', '', group.total_received],
+          })
+        }
+
+        tables.push({
+          banner: `${group.cost_center} · Saldo do centro`,
+          headers: movementHeaders,
+          rows: [],
+          footer: ['Saldo', '', group.balance],
+        })
+
+        return tables
+      }),
+      summary: [
+        { label: 'Total pago', value: filteredPaid },
+        { label: 'Total recebido', value: filteredReceived },
+        { label: 'Saldo do dia', value: filteredBalance },
+      ],
+    })
+  }
+
   return (
     <Card>
       <CardContent className="space-y-4">
@@ -251,26 +312,26 @@ function DailySection() {
           <>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="grid flex-1 gap-4 sm:grid-cols-3">
-                <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
-                <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
-                <Summary label="Saldo do dia" value={query.data?.balance ?? 0} />
+                <Summary label="Total pago" value={filteredPaid} accent="text-danger" />
+                <Summary label="Total recebido" value={filteredReceived} accent="text-success" />
+                <Summary label="Saldo do dia" value={filteredBalance} />
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <ReportViewButton onClick={() => setViewerOpen(true)} />
                 <ReportExportButtons
                   disabled={query.isPending}
-                  onExportXlsx={() => reportsService.dailyExport(exportParams)}
+                  onExportXlsx={exportDailyXlsx}
                   onExportPdf={() =>
                     printHtmlReport(
                       'Relatório diário',
                       buildReportHtml({
                         title: 'Relatório diário',
-                        subtitle: `Data: ${formatDate(date)} · ${costCenterLabel}`,
+                        subtitle,
                         sections: dailyPdfSections,
                         summary: [
-                          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-                          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-                          { label: 'Saldo do dia', value: formatCurrency(query.data?.balance ?? 0) },
+                          { label: 'Total pago', value: formatCurrency(filteredPaid) },
+                          { label: 'Total recebido', value: formatCurrency(filteredReceived) },
+                          { label: 'Saldo do dia', value: formatCurrency(filteredBalance) },
                         ],
                       }),
                     )
@@ -299,9 +360,9 @@ function DailySection() {
         columns={movementColumns}
         sections={dailyScreenSections}
         summary={[
-          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-          { label: 'Saldo do dia', value: formatCurrency(query.data?.balance ?? 0) },
+          { label: 'Total pago', value: formatCurrency(filteredPaid) },
+          { label: 'Total recebido', value: formatCurrency(filteredReceived) },
+          { label: 'Saldo do dia', value: formatCurrency(filteredBalance) },
         ]}
         rowKey={(row, index) => `${row.description}-${index}`}
       />
@@ -328,6 +389,9 @@ function WeeklySection() {
   }
 
   const weeklyGroups = applyColumnTableState(query.data?.groups ?? [], columnState, weeklyAccessors)
+  const filteredPaid = weeklyGroups.reduce((sum, group) => sum + group.total_paid, 0)
+  const filteredReceived = weeklyGroups.reduce((sum, group) => sum + group.total_received, 0)
+  const filteredBalance = weeklyGroups.reduce((sum, group) => sum + group.net_balance, 0)
 
   const weeklyColumns: ScreenReportColumn<WeeklyGroupRow>[] = [
     { key: 'cost_center', header: 'Centro de custo', cell: (row) => row.cost_center },
@@ -343,7 +407,31 @@ function WeeklySection() {
         ? `${formatDate(from)} até ${formatDate(to)}`
         : 'Período não definido'
 
-  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
+  const subtitle = `Período: ${periodLabel} · ${costCenterLabel}`
+
+  const exportWeeklyXlsx = () => {
+    downloadReportXlsx({
+      filename: 'relatorio-semanal.xlsx',
+      title: 'Relatório semanal',
+      subtitleLines: [subtitle],
+      tables: [
+        {
+          headers: ['Centro de custo', 'Total pago', 'Total recebido', 'Saldo líquido'],
+          rows: weeklyGroups.map((group) => [
+            group.cost_center,
+            group.total_paid,
+            group.total_received,
+            group.net_balance,
+          ]),
+        },
+      ],
+      summary: [
+        { label: 'Total pago', value: filteredPaid },
+        { label: 'Total recebido', value: filteredReceived },
+        { label: 'Saldo líquido', value: filteredBalance },
+      ],
+    })
+  }
 
   return (
     <Card>
@@ -365,21 +453,21 @@ function WeeklySection() {
         ) : (
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="grid flex-1 gap-4 sm:grid-cols-3">
-              <Summary label="Total pago" value={query.data?.total_paid ?? 0} accent="text-danger" />
-              <Summary label="Total recebido" value={query.data?.total_received ?? 0} accent="text-success" />
-              <Summary label="Saldo líquido" value={query.data?.net_balance ?? 0} />
+              <Summary label="Total pago" value={filteredPaid} accent="text-danger" />
+              <Summary label="Total recebido" value={filteredReceived} accent="text-success" />
+              <Summary label="Saldo líquido" value={filteredBalance} />
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <ReportViewButton onClick={() => setViewerOpen(true)} />
               <ReportExportButtons
                 disabled={query.isPending}
-                onExportXlsx={() => reportsService.weeklyExport(exportParams)}
+                onExportXlsx={exportWeeklyXlsx}
                 onExportPdf={() =>
                   printHtmlReport(
                     'Relatório semanal',
                     buildReportHtml({
                       title: 'Relatório semanal',
-                      subtitle: `Período: ${periodLabel} · ${costCenterLabel}`,
+                      subtitle,
                       sections: weeklyGroups.map((group) => ({
                         title: group.cost_center,
                         headers: ['Total pago', 'Total recebido', 'Saldo líquido'],
@@ -388,9 +476,9 @@ function WeeklySection() {
                         footer: { label: 'Saldo do centro', value: formatCurrency(group.net_balance) },
                       })),
                       summary: [
-                        { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-                        { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-                        { label: 'Saldo líquido', value: formatCurrency(query.data?.net_balance ?? 0) },
+                        { label: 'Total pago', value: formatCurrency(filteredPaid) },
+                        { label: 'Total recebido', value: formatCurrency(filteredReceived) },
+                        { label: 'Saldo líquido', value: formatCurrency(filteredBalance) },
                       ],
                     }),
                   )
@@ -438,7 +526,7 @@ function WeeklySection() {
         open={viewerOpen}
         onClose={() => setViewerOpen(false)}
         title="Relatório semanal"
-        description={`Período: ${periodLabel} · ${costCenterLabel}`}
+        description={subtitle}
         columns={weeklyColumns}
         sections={weeklyGroups.map((group) => ({
           title: group.cost_center,
@@ -446,9 +534,9 @@ function WeeklySection() {
           footer: { label: 'Saldo do centro', value: formatCurrency(group.net_balance) },
         }))}
         summary={[
-          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-          { label: 'Saldo líquido', value: formatCurrency(query.data?.net_balance ?? 0) },
+          { label: 'Total pago', value: formatCurrency(filteredPaid) },
+          { label: 'Total recebido', value: formatCurrency(filteredReceived) },
+          { label: 'Saldo líquido', value: formatCurrency(filteredBalance) },
         ]}
         rowKey={(row) => row.cost_center}
       />
@@ -576,23 +664,102 @@ function CategorySection() {
         : 'Período não definido'
 
   const categoryGroups = (query.data?.groups ?? [])
-    .map((group) => ({
-      ...group,
-      expense: applyColumnTableState(group.expense, columnState, categoryAccessors),
-    }))
+    .map((group) => {
+      const expense = applyColumnTableState(group.expense, columnState, categoryAccessors)
+      return {
+        ...group,
+        expense,
+        total_expense: expense.reduce((sum, row) => sum + row.total, 0),
+      }
+    })
     .filter((group) => group.expense.length > 0)
 
   const matrix = query.data?.matrix
-  const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
-  const hasMatrixData = (matrix?.groups.length ?? 0) > 0
+  const filteredMatrix = matrix ? applyColumnFiltersToCategoryMatrix(matrix, columnState) : null
+  const hasFilteredData = categoryGroups.length > 0 || (filteredMatrix?.groups.length ?? 0) > 0
+  const subtitle = `Período: ${periodLabel} · ${costCenterLabel}`
 
   const exportCategoryPdf = () => {
-    if (!matrix) return
+    if (filteredMatrix && filteredMatrix.groups.length > 0) {
+      printHtmlReport(
+        'Relatório por categoria',
+        buildCategoryMatrixHtml(filteredMatrix, 'Relatório por categoria', subtitle),
+      )
+      return
+    }
 
     printHtmlReport(
       'Relatório por categoria',
-      buildCategoryMatrixHtml(matrix, 'Relatório por categoria', `Período: ${periodLabel} · ${costCenterLabel}`),
+      buildReportHtml({
+        title: 'Relatório por categoria',
+        subtitle,
+        sections: categoryGroups.map((group) => ({
+          title: group.cost_center,
+          headers: ['Categoria', 'Valor'],
+          rows: group.expense.map((row) => [row.category, formatCurrency(row.total)]),
+          amountColumns: [1],
+          footer: { label: 'Total', value: formatCurrency(group.total_expense) },
+        })),
+      }),
     )
+  }
+
+  const exportCategoryXlsx = () => {
+    if (filteredMatrix && filteredMatrix.groups.length > 0) {
+      downloadReportXlsx({
+        filename: 'relatorio-por-categoria.xlsx',
+        title: 'Relatório por categoria',
+        subtitleLines: [subtitle],
+        tables: filteredMatrix.groups.flatMap((group) => {
+          const headers = ['Descrição', ...filteredMatrix.columns.map((column) => column.label), 'Total geral']
+          const rows: Array<Array<string | number | null>> = []
+
+          for (const category of group.categories) {
+            rows.push([
+              `${category.category} - Totais`,
+              ...filteredMatrix.columns.map((column) => category.subtotal.amounts[column.key] ?? null),
+              category.subtotal.total,
+            ])
+            for (const subcategory of category.subcategories) {
+              rows.push([
+                `${subcategory.subcategory} - Totais`,
+                ...filteredMatrix.columns.map((column) => subcategory.subtotal.amounts[column.key] ?? null),
+                subcategory.subtotal.total,
+              ])
+            }
+          }
+
+          return [
+            {
+              banner: group.cost_center,
+              headers,
+              rows,
+              footer: [
+                `${group.cost_center} - Totais`,
+                ...filteredMatrix.columns.map((column) => group.subtotal.amounts[column.key] ?? null),
+                group.subtotal.total,
+              ],
+            },
+          ]
+        }),
+        summary: [
+          { label: 'Total geral do período', value: filteredMatrix.grand_total.total },
+        ],
+      })
+      return
+    }
+
+    downloadReportXlsx({
+      filename: 'relatorio-por-categoria.xlsx',
+      title: 'Relatório por categoria',
+      subtitleLines: [subtitle],
+      tables: categoryGroups.map((group) => ({
+        banner: group.cost_center,
+        headers: ['Categoria', 'Valor'],
+        rows: group.expense.map((row) => [row.category, row.total]),
+        footer: ['Total', group.total_expense],
+      })),
+    })
   }
 
   return (
@@ -615,10 +782,10 @@ function CategorySection() {
         ) : (
           <>
             <div className="flex flex-wrap justify-end gap-2">
-              <CategoryViewButton onClick={() => setViewerOpen(true)} disabled={!hasMatrixData} />
+              <CategoryViewButton onClick={() => setViewerOpen(true)} disabled={!hasFilteredData} />
               <ReportExportButtons
-                disabled={!hasMatrixData}
-                onExportXlsx={() => reportsService.byCategoryExport(exportParams)}
+                disabled={!hasFilteredData}
+                onExportXlsx={exportCategoryXlsx}
                 onExportPdf={exportCategoryPdf}
               />
             </div>
@@ -643,11 +810,11 @@ function CategorySection() {
         )}
       </CardContent>
 
-      {matrix && query.data && (
+      {filteredMatrix && query.data && (
         <CategoryMatrixViewer
           open={viewerOpen}
           onClose={() => setViewerOpen(false)}
-          matrix={matrix}
+          matrix={filteredMatrix}
           from={query.data.from}
           to={query.data.to}
           costCenterLabel={costCenterLabel}
@@ -793,13 +960,38 @@ function CostCenterSection() {
     { key: 'balance', header: 'Saldo', align: 'right', cell: (row) => formatCurrency(row.balance) },
   ]
 
-  const exportParams = { cost_center_id: costCenterId || undefined }
   const costCenterHeaders = ['Centro de custo', 'Saldo inicial', 'Entradas', 'Saídas', 'Saldo']
   const grandTotals = {
     initial: rows.reduce((sum, row) => sum + row.initial_balance, 0),
     income: rows.reduce((sum, row) => sum + row.income, 0),
     expense: rows.reduce((sum, row) => sum + row.expense, 0),
     balance: rows.reduce((sum, row) => sum + row.balance, 0),
+  }
+
+  const exportCostCenterXlsx = () => {
+    downloadReportXlsx({
+      filename: 'relatorio-por-centro-de-custo.xlsx',
+      title: 'Relatório por centro de custo',
+      subtitleLines: [costCenterLabel],
+      tables: [
+        {
+          headers: costCenterHeaders,
+          rows: rows.map((row) => [
+            row.cost_center,
+            row.initial_balance,
+            row.income,
+            row.expense,
+            row.balance,
+          ]),
+        },
+      ],
+      summary: [
+        { label: 'Saldo inicial total', value: grandTotals.initial },
+        { label: 'Entradas totais', value: grandTotals.income },
+        { label: 'Saídas totais', value: grandTotals.expense },
+        { label: 'Saldo total', value: grandTotals.balance },
+      ],
+    })
   }
 
   return (
@@ -814,7 +1006,7 @@ function CostCenterSection() {
               <ReportViewButton onClick={() => setViewerOpen(true)} />
               <ReportExportButtons
                 disabled={query.isPending}
-                onExportXlsx={() => reportsService.byCostCenterExport(exportParams)}
+                onExportXlsx={exportCostCenterXlsx}
                 onExportPdf={() =>
                   printHtmlReport(
                     'Relatório por centro de custo',
@@ -822,13 +1014,17 @@ function CostCenterSection() {
                       title: 'Relatório por centro de custo',
                       subtitle: costCenterLabel,
                       sections: [
-                        ...rows.map((row) => ({
-                          title: row.cost_center,
+                        {
                           headers: costCenterHeaders,
-                          rows: [[row.cost_center, formatCurrency(row.initial_balance), formatCurrency(row.income), formatCurrency(row.expense), formatCurrency(row.balance)]],
+                          rows: rows.map((row) => [
+                            row.cost_center,
+                            formatCurrency(row.initial_balance),
+                            formatCurrency(row.income),
+                            formatCurrency(row.expense),
+                            formatCurrency(row.balance),
+                          ]),
                           amountColumns: [1, 2, 3, 4],
-                          footer: { label: 'Saldo do centro', value: formatCurrency(row.balance) },
-                        })),
+                        },
                       ],
                       summary: [
                         { label: 'Saldo inicial total', value: formatCurrency(grandTotals.initial) },
@@ -903,6 +1099,11 @@ function CashFlowSection() {
   }
 
   const cashFlowGroups = applyColumnTableState(query.data?.groups ?? [], columnState, accessors)
+  const filteredComparative = {
+    realized_net: cashFlowGroups.reduce((sum, group) => sum + group.realized_net, 0),
+    projected_net: cashFlowGroups.reduce((sum, group) => sum + group.projected_net, 0),
+    expected_final_balance: cashFlowGroups.reduce((sum, group) => sum + group.expected_final_balance, 0),
+  }
 
   const cashFlowGroupColumns: Array<Column<CashFlowGroupRow>> = [
     {
@@ -937,11 +1138,32 @@ function CashFlowSection() {
     { key: 'expected_final_balance', header: 'Saldo final esperado', align: 'right', cell: (row) => formatCurrency(row.expected_final_balance) },
   ]
 
-  const exportParams = {
-    from: from || undefined,
-    to: to || undefined,
-    days,
-    cost_center_id: costCenterId || undefined,
+  const subtitle = query.data
+    ? `Período: ${formatDate(query.data.realized.from)} até ${formatDate(query.data.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`
+    : costCenterLabel
+
+  const exportCashFlowXlsx = () => {
+    downloadReportXlsx({
+      filename: 'demonstrativo-fluxo-caixa.xlsx',
+      title: 'Demonstrativo de fluxo de caixa',
+      subtitleLines: [subtitle],
+      tables: [
+        {
+          headers: ['Centro de custo', 'Resultado realizado', 'Resultado projetado', 'Saldo final esperado'],
+          rows: cashFlowGroups.map((group) => [
+            group.cost_center,
+            group.realized_net,
+            group.projected_net,
+            group.expected_final_balance,
+          ]),
+        },
+      ],
+      summary: [
+        { label: 'Resultado realizado', value: filteredComparative.realized_net },
+        { label: 'Resultado projetado', value: filteredComparative.projected_net },
+        { label: 'Saldo final esperado', value: filteredComparative.expected_final_balance },
+      ],
+    })
   }
 
   return (
@@ -972,27 +1194,30 @@ function CashFlowSection() {
             <>
               <ReportViewButton onClick={() => setViewerOpen(true)} />
               <ReportExportButtons
-                onExportXlsx={() => reportsService.cashFlowExport(exportParams)}
+                onExportXlsx={exportCashFlowXlsx}
                 onExportPdf={() =>
                   printHtmlReport(
                     'Demonstrativo de fluxo de caixa',
                     buildReportHtml({
                       title: 'Demonstrativo de fluxo de caixa',
-                      subtitle: `Período: ${formatDate(query.data!.realized.from)} até ${formatDate(query.data!.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`,
-                      sections: cashFlowGroups.map((group) => ({
-                        title: group.cost_center,
-                        headers: ['Resultado realizado', 'Resultado projetado', 'Saldo final esperado'],
-                        rows: [[formatCurrency(group.realized_net), formatCurrency(group.projected_net), formatCurrency(group.expected_final_balance)]],
-                        amountColumns: [0, 1, 2],
-                        footer: { label: 'Saldo final esperado', value: formatCurrency(group.expected_final_balance) },
-                      })),
-                      summary: query.data
-                        ? [
-                            { label: 'Resultado realizado', value: formatCurrency(query.data.comparative.realized_net) },
-                            { label: 'Resultado projetado', value: formatCurrency(query.data.comparative.projected_net) },
-                            { label: 'Saldo final esperado', value: formatCurrency(query.data.comparative.expected_final_balance) },
-                          ]
-                        : undefined,
+                      subtitle,
+                      sections: [
+                        {
+                          headers: ['Centro de custo', 'Resultado realizado', 'Resultado projetado', 'Saldo final esperado'],
+                          rows: cashFlowGroups.map((group) => [
+                            group.cost_center,
+                            formatCurrency(group.realized_net),
+                            formatCurrency(group.projected_net),
+                            formatCurrency(group.expected_final_balance),
+                          ]),
+                          amountColumns: [1, 2, 3],
+                        },
+                      ],
+                      summary: [
+                        { label: 'Resultado realizado', value: formatCurrency(filteredComparative.realized_net) },
+                        { label: 'Resultado projetado', value: formatCurrency(filteredComparative.projected_net) },
+                        { label: 'Saldo final esperado', value: formatCurrency(filteredComparative.expected_final_balance) },
+                      ],
                     }),
                   )
                 }
@@ -1007,9 +1232,9 @@ function CashFlowSection() {
           query.data && (
             <>
               <div className="grid gap-4 sm:grid-cols-3">
-                <Summary label="Resultado realizado" value={query.data.comparative.realized_net} />
-                <Summary label="Resultado projetado" value={query.data.comparative.projected_net} />
-                <Summary label="Saldo final esperado" value={query.data.comparative.expected_final_balance} />
+                <Summary label="Resultado realizado" value={filteredComparative.realized_net} />
+                <Summary label="Resultado projetado" value={filteredComparative.projected_net} />
+                <Summary label="Saldo final esperado" value={filteredComparative.expected_final_balance} />
               </div>
               <DataTable
                 columns={cashFlowGroupColumns}
@@ -1026,22 +1251,18 @@ function CashFlowSection() {
         open={viewerOpen}
         onClose={() => setViewerOpen(false)}
         title="Demonstrativo de fluxo de caixa"
-        description={`Período: ${formatDate(query.data?.realized.from)} até ${formatDate(query.data?.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`}
+        description={subtitle}
         columns={cashFlowGroupScreenColumns}
-        sections={cashFlowGroups.map((group) => ({
-          title: group.cost_center,
-          rows: [group],
-          footer: { label: 'Saldo final esperado', value: formatCurrency(group.expected_final_balance) },
-        }))}
-        summary={
-          query.data
-            ? [
-                { label: 'Resultado realizado', value: formatCurrency(query.data.comparative.realized_net) },
-                { label: 'Resultado projetado', value: formatCurrency(query.data.comparative.projected_net) },
-                { label: 'Saldo final esperado', value: formatCurrency(query.data.comparative.expected_final_balance) },
-              ]
-            : undefined
-        }
+        sections={[
+          {
+            rows: cashFlowGroups,
+          },
+        ]}
+        summary={[
+          { label: 'Resultado realizado', value: formatCurrency(filteredComparative.realized_net) },
+          { label: 'Resultado projetado', value: formatCurrency(filteredComparative.projected_net) },
+          { label: 'Saldo final esperado', value: formatCurrency(filteredComparative.expected_final_balance) },
+        ]}
         rowKey={(row) => row.cost_center}
       />
     </Card>
@@ -1066,8 +1287,6 @@ function PayablesSection() {
   const payableAccessors = {
     due_date: (account: PayableAccount) => account.due_date,
     description: (account: PayableAccount) => account.description,
-    counterparty: (account: PayableAccount) => account.counterparty ?? '',
-    category: (account: PayableAccount) => account.category ?? '',
     installment: (account: PayableAccount) => account.installment ?? '',
     remaining_amount: (account: PayableAccount) => account.remaining_amount,
   }
@@ -1080,6 +1299,14 @@ function PayablesSection() {
       accounts: applyColumnTableState(group.accounts, columnState, payableAccessors),
     }))
     .filter((group) => group.accounts.length > 0)
+
+  const filteredPayablesData = data
+    ? {
+        ...data,
+        accounts,
+        groups,
+      }
+    : null
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -1107,25 +1334,78 @@ function PayablesSection() {
   const totalRemaining = remainingAccounts.reduce((sum, account) => sum + account.remaining_amount, 0)
   const totalAnalyzed = accounts.reduce((sum, account) => sum + account.remaining_amount, 0)
 
-  const exportParams = {
-    from: from || undefined,
-    to: to || undefined,
-    cost_center_id: costCenterId || undefined,
-    selected_ids: Array.from(selected).join(','),
-  }
-
   const exportSubtitle = data
     ? `Referência: ${formatShortDate(data.reference_date)} · Período: ${formatShortDate(data.from)} até ${formatShortDate(data.to)} · ${costCenterLabel}`
     : costCenterLabel
 
-  const exportPayablesPdf = () => {
-    if (!data) return
+  const exportViewData = filteredPayablesData ? buildPayablesExportReport(filteredPayablesData, selected) : null
 
-    const exportData = buildPayablesExportReport(data, selected)
-    printHtmlReport('Relatório de contas a pagar', buildPayablesReportHtml(exportData, 'Relatório de contas a pagar', exportSubtitle))
+  const exportPayablesPdf = () => {
+    if (!exportViewData) return
+    printHtmlReport('Relatório de contas a pagar', buildPayablesReportHtml(exportViewData, 'Relatório de contas a pagar', exportSubtitle))
   }
 
-  const exportViewData = data ? buildPayablesExportReport(data, selected) : null
+  const exportPayablesXlsx = () => {
+    if (!exportViewData) return
+
+    const referenceDate = formatShortDate(exportViewData.reference_date)
+    const tables = exportViewData.groups.flatMap((group) => {
+      const groupTables = []
+
+      groupTables.push({
+        banner: group.cost_center,
+        headers: ['Data', 'Descrição', 'Valor'],
+        rows: [] as Array<Array<string | number | null>>,
+      })
+
+      if (group.overdue.accounts.length > 0) {
+        groupTables.push({
+          banner: 'EM ATRASO',
+          headers: ['Data', 'Descrição', 'Valor'],
+          rows: group.overdue.accounts.map((account) => [
+            formatShortDate(account.due_date),
+            account.description,
+            account.remaining_amount,
+          ]),
+          footer: ['TOTAL EM ATRASO', '', group.overdue.total],
+        })
+      }
+
+      if (group.due_today.accounts.length > 0) {
+        groupTables.push({
+          banner: `PAGOS EM ${referenceDate}`,
+          headers: ['Data', 'Descrição', 'Valor'],
+          rows: group.due_today.accounts.map((account) => [
+            formatShortDate(account.due_date),
+            account.description,
+            account.remaining_amount,
+          ]),
+          footer: ['TOTAL PAGO', '', group.due_today.total],
+        })
+      }
+
+      return groupTables
+    })
+
+    downloadReportXlsx({
+      filename: 'contas-a-pagar.xlsx',
+      title: 'Relatório de contas a pagar',
+      subtitleLines: [exportSubtitle],
+      tables: [
+        ...tables,
+        {
+          banner: `Resumo geral em ${referenceDate}`,
+          headers: ['Centro de custo', 'Pagos', 'Em atraso'],
+          rows: exportViewData.summary.paid_today.rows.map((row, index) => [
+            row.cost_center,
+            row.amount,
+            exportViewData.summary.overdue.rows[index]?.amount ?? 0,
+          ]),
+          footer: ['TOTAL', exportViewData.summary.paid_today.total, exportViewData.summary.overdue.total],
+        },
+      ],
+    })
+  }
 
   const columnsFor = (group: (typeof groups)[number], index: number): Array<Column<PayableAccount>> => {
     const allInGroupSelected = group.accounts.length > 0 && group.accounts.every((account) => selected.has(account.id))
@@ -1178,16 +1458,6 @@ function PayablesSection() {
         render: (account) => (
           <span className="font-medium text-foreground">{account.description}</span>
         ),
-      },
-      {
-        key: 'counterparty',
-        header: renderColumnHeader('counterparty', 'Fornecedor', { placeholder: 'Filtrar…' }),
-        render: (account) => <span className="text-muted">{account.counterparty ?? '—'}</span>,
-      },
-      {
-        key: 'category',
-        header: renderColumnHeader('category', 'Categoria', { placeholder: 'Filtrar…' }),
-        render: (account) => <span className="text-muted">{account.category ?? '—'}</span>,
       },
       {
         key: 'installment',
@@ -1272,7 +1542,7 @@ function PayablesSection() {
               <PayablesViewButton onClick={() => setViewerOpen(true)} disabled={accounts.length === 0} />
               <ReportExportButtons
                 disabled={accounts.length === 0}
-                onExportXlsx={() => reportsService.payablesExport(exportParams)}
+                onExportXlsx={exportPayablesXlsx}
                 onExportPdf={exportPayablesPdf}
               />
             </div>

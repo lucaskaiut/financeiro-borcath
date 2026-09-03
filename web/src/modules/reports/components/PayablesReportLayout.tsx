@@ -8,8 +8,8 @@ interface PayablesReportLayoutProps {
   className?: string
 }
 
-const HEADERS = ['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'] as const
-const COL_WIDTHS = ['12%', '34%', '22%', '18%', '14%'] as const
+const HEADERS = ['Data', 'Descrição', 'Valor'] as const
+const COL_WIDTHS = ['16%', '60%', '24%'] as const
 
 export function PayablesReportLayout({ data, compact = false, className }: PayablesReportLayoutProps) {
   const cellClass = compact ? 'px-2 py-1 text-[11px]' : 'px-3 py-2 text-sm'
@@ -54,7 +54,7 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
                     <AccountRow key={account.id} account={account} cellClass={cellClass} />
                   ))}
                   <TotalRow
-                    colSpan={4}
+                    colSpan={2}
                     label="TOTAL EM ATRASO"
                     value={group.overdue.total}
                     cellClass={cellClass}
@@ -75,7 +75,7 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
                   {group.due_today.accounts.map((account) => (
                     <AccountRow key={account.id} account={account} cellClass={cellClass} />
                   ))}
-                  <TotalRow colSpan={4} label="TOTAL PAGO" value={group.due_today.total} cellClass={cellClass} tone="success" />
+                  <TotalRow colSpan={2} label="TOTAL PAGO" value={group.due_today.total} cellClass={cellClass} tone="success" />
                 </>
               )}
             </tbody>
@@ -123,8 +123,6 @@ function AccountRow({ account, cellClass }: { account: PayableAccount; cellClass
     <tr className="border-b border-surface-3/60 text-foreground">
       <td className={cn(cellClass, 'whitespace-nowrap text-left tabular-nums')}>{formatShortDate(account.due_date)}</td>
       <td className={cn(cellClass, 'text-left')}>{account.description}</td>
-      <td className={cn(cellClass, 'text-left text-muted')}>{account.counterparty ?? '—'}</td>
-      <td className={cn(cellClass, 'text-left text-muted')}>{account.category ?? '—'}</td>
       <td className={cn(cellClass, 'whitespace-nowrap text-right font-medium tabular-nums')}>
         {formatCurrency(account.remaining_amount)}
       </td>

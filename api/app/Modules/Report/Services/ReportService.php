@@ -1032,7 +1032,7 @@ class ReportService
                     "Referência: {$referenceLabel}",
                 ],
             );
-            $columnCount = 5;
+            $columnCount = 3;
 
             foreach ($exportGroups as $group) {
                 $sheet->setCellValue("A{$row}", $group['cost_center']);
@@ -1047,7 +1047,7 @@ class ReportService
                     $row++;
 
                     $headerRow = $row;
-                    $sheet->fromArray(['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'], null, "A{$row}");
+                    $sheet->fromArray(['Data', 'Descrição', 'Valor'], null, "A{$row}");
                     $row++;
                     $dataStartRow = $row;
 
@@ -1055,18 +1055,16 @@ class ReportService
                         $sheet->fromArray([
                             Carbon::parse($account['due_date'])->format('d/m/Y'),
                             $account['description'],
-                            $account['counterparty'] ?? '',
-                            $account['category'] ?? '',
                             $this->xlsxMoney($account['remaining_amount']),
                         ], null, "A{$row}");
                         $row++;
                     }
 
                     $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount, 'FFF3F4F6');
-                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 4, false);
+                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 2, false);
 
                     $sheet->setCellValue("A{$row}", 'TOTAL EM ATRASO');
-                    $sheet->setCellValue('E'.$row, $this->xlsxMoney($group['overdue']['total']));
+                    $sheet->setCellValue('C'.$row, $this->xlsxMoney($group['overdue']['total']));
                     $this->applyXlsxFooterRow($sheet, $row, $columnCount);
                     $sheet->getStyle("A{$row}:{$this->xlsxColumnLetter($columnCount)}{$row}")->getFont()->getColor()->setARGB('FFFF0000');
                     $row += 2;
@@ -1080,7 +1078,7 @@ class ReportService
                     $row++;
 
                     $headerRow = $row;
-                    $sheet->fromArray(['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'], null, "A{$row}");
+                    $sheet->fromArray(['Data', 'Descrição', 'Valor'], null, "A{$row}");
                     $row++;
                     $dataStartRow = $row;
 
@@ -1088,18 +1086,16 @@ class ReportService
                         $sheet->fromArray([
                             Carbon::parse($account['due_date'])->format('d/m/Y'),
                             $account['description'],
-                            $account['counterparty'] ?? '',
-                            $account['category'] ?? '',
                             $this->xlsxMoney($account['remaining_amount']),
                         ], null, "A{$row}");
                         $row++;
                     }
 
                     $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount, 'FFF3F4F6');
-                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 4, false);
+                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 2, false);
 
                     $sheet->setCellValue("A{$row}", 'TOTAL PAGO');
-                    $sheet->setCellValue('E'.$row, $this->xlsxMoney($group['due_today']['total']));
+                    $sheet->setCellValue('C'.$row, $this->xlsxMoney($group['due_today']['total']));
                     $this->applyXlsxFooterRow($sheet, $row, $columnCount);
                     $sheet->getStyle("A{$row}:{$this->xlsxColumnLetter($columnCount)}{$row}")->getFont()->getColor()->setARGB('FF008000');
                     $row += 2;
@@ -1674,7 +1670,6 @@ class ReportService
 
             $this->applyXlsxDataArea($sheet, $dataStartRow, $grandRow - 1, $columnCount, 1, false);
             $this->applyXlsxColumnWidths($sheet, $columnCount, 40, 14);
-            $sheet->freezePane('A'.($headerRow + 1));
 
             $lastColumn = $this->xlsxColumnLetter($columnCount);
 
@@ -2011,7 +2006,6 @@ class ReportService
         }
 
         $this->applyXlsxColumnWidths($sheet, $columnCount);
-        $sheet->freezePane("A{$dataStartRow}");
     }
 
     private function applyMonthlySummarySheetStyles(
@@ -2028,7 +2022,6 @@ class ReportService
         $this->applyXlsxTotalRow($sheet, $totalRow, $columnCount, true);
         $this->applyXlsxAverageRow($sheet, $averageRow, $columnCount);
         $this->applyXlsxColumnWidths($sheet, $columnCount);
-        $sheet->freezePane("A{$dataStartRow}");
     }
 
     public function byCostCenterExport(?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse

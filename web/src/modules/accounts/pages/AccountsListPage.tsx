@@ -211,14 +211,20 @@ export default function AccountsListPage() {
     {
       key: 'paid_date',
       header: 'Data da baixa',
-      render: (a) => <span className="text-muted">{formatDate(a.paid_date)}</span>,
+      className: 'text-center',
+      render: (a) => <span className="inline-block text-muted tabular-nums">{formatDate(a.paid_date)}</span>,
     },
     {
       key: 'status',
       header: 'Status',
+      className: 'text-center',
       render: (a) => {
         const s = STATUS_LABELS[a.status]
-        return <Badge variant={s.variant}>{s.label}</Badge>
+        return (
+          <span className="inline-flex justify-center">
+            <Badge variant={s.variant}>{s.label}</Badge>
+          </span>
+        )
       },
     },
     {
