@@ -1,12 +1,15 @@
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' })
-const shortDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+/** Formato único de data no sistema: DD/MM/YYYY */
+const numericDateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
 })
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
 })
 const relativeFormatter = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' })
 
@@ -41,13 +44,12 @@ function parseDateInput(value: string): Date {
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—'
 
-  return dateFormatter.format(parseDateInput(value))
+  return numericDateFormatter.format(parseDateInput(value))
 }
 
+/** Alias de formatDate — mantido por compatibilidade. Sempre DD/MM/YYYY. */
 export function formatShortDate(value: string | null | undefined): string {
-  if (!value) return '—'
-
-  return shortDateFormatter.format(parseDateInput(value))
+  return formatDate(value)
 }
 
 export function formatDateTime(value: string | null | undefined): string {

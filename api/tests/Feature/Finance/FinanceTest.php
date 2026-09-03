@@ -206,6 +206,38 @@ class FinanceTest extends TestCase
             ->assertJsonPath('data.0.id', $accountB);
     }
 
+    public function test_accounts_overdue_filter_returns_unpaid_past_due(): void
+    {
+        $tenant = $this->createTenantWithRoles();
+        Sanctum::actingAs($this->createAdmin($tenant));
+
+        $costCenterId = $this->createCostCenter();
+        $categoryId = $this->createCategory('expense');
+
+        $overdueId = $this->postJson('/api/accounts', [
+            'type' => 'payable',
+            'description' => 'Conta vencida',
+            'cost_center_id' => $costCenterId,
+            'category_id' => $categoryId,
+            'value' => 150,
+            'due_date' => now()->subDays(5)->toDateString(),
+        ])->json('data.0.id');
+
+        $this->postJson('/api/accounts', [
+            'type' => 'payable',
+            'description' => 'Conta futura',
+            'cost_center_id' => $costCenterId,
+            'category_id' => $categoryId,
+            'value' => 250,
+            'due_date' => now()->addDays(5)->toDateString(),
+        ])->assertCreated();
+
+        $this->getJson('/api/accounts?overdue=1')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $overdueId);
+    }
+
     public function test_settled_account_value_syncs_to_settlement_and_cash_flow(): void
     {
         $tenant = $this->createTenantWithRoles();

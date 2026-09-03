@@ -17,7 +17,7 @@ use InvalidArgumentException;
 class AccountService
 {
     /**
-     * @param  array{per_page?: int, search?: ?string, type?: ?string, status?: ?string, cost_center_id?: ?string, category_id?: ?string, due_from?: ?string, due_to?: ?string, paid_from?: ?string, paid_to?: ?string, installment_group_id?: ?string}  $filters
+     * @param  array{per_page?: int, search?: ?string, type?: ?string, status?: ?string, overdue?: bool|string|null, cost_center_id?: ?string, category_id?: ?string, due_from?: ?string, due_to?: ?string, paid_from?: ?string, paid_to?: ?string, installment_group_id?: ?string}  $filters
      */
     public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
@@ -25,8 +25,17 @@ class AccountService
             ->with(['costCenter:id,uuid,name', 'category:id,uuid,name,color,type', 'subcategory:id,uuid,name'])
             ->withSum('settlements', 'value');
 
+        $overdue = filter_var($filters['overdue'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
         $query->when(filled($filters['type'] ?? null), fn ($q) => $q->where('type', $filters['type']));
-        $query->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']));
+
+        if ($overdue) {
+            $query->whereIn('status', [AccountStatus::Open->value, AccountStatus::Partial->value])
+                ->whereDate('due_date', '<', now()->toDateString());
+        } else {
+            $query->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']));
+        }
+
         $query->when(filled($filters['cost_center_id'] ?? null), fn ($q) => $q->where('cost_center_id', $filters['cost_center_id']));
         $query->when(filled($filters['category_id'] ?? null), fn ($q) => $q->where('category_id', $filters['category_id']));
         $query->when(filled($filters['installment_group_id'] ?? null), fn ($q) => $q->where('installment_group_id', $filters['installment_group_id']));

@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import { forwardRef, type ComponentProps } from 'react'
 import { cn } from '@/shared/utils/cn'
 
 export interface InputProps extends ComponentProps<'input'> {
@@ -14,6 +14,16 @@ export const inputClasses = (invalid?: boolean, className?: string) =>
     className,
   )
 
-export function Input({ invalid, className, ...props }: InputProps) {
-  return <input aria-invalid={invalid || undefined} className={inputClasses(invalid, className)} {...props} />
-}
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { invalid, className, ...props },
+  ref,
+) {
+  return (
+    <input
+      ref={ref}
+      aria-invalid={invalid || undefined}
+      className={inputClasses(invalid, className)}
+      {...props}
+    />
+  )
+})

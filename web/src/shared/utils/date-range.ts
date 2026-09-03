@@ -443,10 +443,10 @@ export function formatMonthYearLabel(from: string, to: string): string | null {
     return null
   }
 
-  const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
-  const label = formatter.format(start)
+  const month = String(start.getMonth() + 1).padStart(2, '0')
+  const year = start.getFullYear()
 
-  return label.charAt(0).toUpperCase() + label.slice(1)
+  return `${month}/${year}`
 }
 
 export function getVisiblePresets(options: { variant?: 'range' | 'single'; allowAllTime?: boolean }): DateRangePresetDefinition[] {

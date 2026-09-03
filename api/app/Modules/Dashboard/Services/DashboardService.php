@@ -77,6 +77,20 @@ class DashboardService
                     ->sortBy('due_date')
                     ->take(8),
             ),
+            'payables_next_7d' => $this->presentAccounts(
+                $payableOpen
+                    ->where('due_date', '>=', $today)
+                    ->where('due_date', '<=', now()->addDays(7)->endOfDay())
+                    ->sortBy('due_date')
+                    ->values(),
+            ),
+            'payables_next_7d_total' => round(
+                $payableOpen
+                    ->where('due_date', '>=', $today)
+                    ->where('due_date', '<=', now()->addDays(7)->endOfDay())
+                    ->sum(fn (FinancialAccount $a) => $a->value - $a->settlements_sum_value),
+                2,
+            ),
         ];
     }
 

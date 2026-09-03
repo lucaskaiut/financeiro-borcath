@@ -66,6 +66,8 @@ export interface DashboardSummary {
   balance_by_cost_center: CostCenterBalance[]
   overdue: DashboardAccount[]
   upcoming: DashboardAccount[]
+  payables_next_7d: DashboardAccount[]
+  payables_next_7d_total: number
 }
 
 export const dashboardService = {

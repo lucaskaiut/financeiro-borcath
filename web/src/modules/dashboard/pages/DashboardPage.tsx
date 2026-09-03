@@ -24,9 +24,8 @@ import { formatCurrency, formatDate } from '@/shared/utils/format'
 import { cn } from '@/shared/utils/cn'
 import { useDashboardSummary } from '../hooks/useDashboard'
 import { useMounted } from '../hooks/useMounted'
-import { MonthlyCashFlowChart } from '../components/MonthlyCashFlowChart'
-import { ProjectedBalanceChart } from '../components/ProjectedBalanceChart'
 import { CategoryBarList } from '../components/CategoryBarList'
+import { UpcomingPayablesWidget } from '../components/UpcomingPayablesWidget'
 import type { DashboardAccount, DashboardKpis } from '../services/dashboard.service'
 
 function KpiCard({
@@ -79,7 +78,6 @@ function KpiCard({
 
 function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
   const mounted = useMounted()
-  const projectedPositive = kpis.projected_7d >= 0
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -116,15 +114,6 @@ function KpiGrid({ kpis }: { kpis: DashboardKpis }) {
         hint={`${kpis.overdue_count} ${kpis.overdue_count === 1 ? 'lançamento' : 'lançamentos'} em atraso`}
         accent={kpis.overdue_count > 0 ? 'bg-danger-soft text-danger' : 'bg-surface-2 text-muted'}
       />
-      <KpiCard
-        mounted={mounted}
-        index={4}
-        label="Projeção 7 dias"
-        icon={CalendarClock}
-        value={formatCurrency(kpis.projected_7d)}
-        hint={kpis.projected_balance !== null ? `Saldo projetado: ${formatCurrency(kpis.projected_balance)}` : undefined}
-        accent={projectedPositive ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}
-      />
     </div>
   )
 }
@@ -155,7 +144,7 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="flex items-center gap-3">
               <Skeleton className="size-10 rounded-xl" />
@@ -167,18 +156,11 @@ function DashboardSkeleton() {
           </Card>
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent>
-            <Skeleton className="h-52 w-full" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Skeleton className="h-52 w-full" />
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent>
+          <Skeleton className="h-72 w-full" />
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -226,22 +208,7 @@ export default function DashboardPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardContent>
-                  <h2 className="mb-4 text-sm font-semibold text-foreground">Fluxo de caixa realizado</h2>
-                  <MonthlyCashFlowChart data={data.cash_flow_series} />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent>
-                  <ProjectedBalanceChart data={data.projected_series} />
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
-                <CardContent>
-                  <CategoryBarList title="Despesas por categoria" rows={data.expense_by_category} accent="bg-danger" />
+                  <UpcomingPayablesWidget accounts={data.payables_next_7d} total={data.payables_next_7d_total} />
                 </CardContent>
               </Card>
 
@@ -256,18 +223,11 @@ export default function DashboardPage() {
                   ) : (
                     <div className="space-y-3">
                       {data.balance_by_cost_center.map((row) => (
-                        <div key={row.cost_center_id} className="rounded-lg bg-surface-2/60 p-3">
+                        <div key={row.cost_center_id} className="flex items-center justify-between rounded-lg bg-surface-2/60 p-3">
                           <p className="text-[13px] font-medium text-foreground">{row.cost_center}</p>
-                          <div className="mt-1 flex items-center justify-between text-xs text-muted">
-                            <span>
-                              <span className="text-success">+{formatCurrency(row.income)}</span>
-                              {' · '}
-                              <span className="text-danger">-{formatCurrency(row.expense)}</span>
-                            </span>
-                            <span className={cn('text-[13px] font-semibold', row.balance >= 0 ? 'text-success' : 'text-danger')}>
-                              {formatCurrency(row.balance)}
-                            </span>
-                          </div>
+                          <span className={cn('text-[13px] font-semibold tabular-nums', row.balance >= 0 ? 'text-success' : 'text-danger')}>
+                            {formatCurrency(row.balance)}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -275,6 +235,18 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardContent>
+                <CategoryBarList
+                  title="Despesas por categoria"
+                  rows={data.expense_by_category}
+                  accent="bg-danger"
+                  maxItems={12}
+                  expanded
+                />
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
@@ -284,7 +256,7 @@ export default function DashboardPage() {
                       <AlertTriangle className="size-4 text-danger" />
                       Lançamentos vencidos
                     </h2>
-                    <ButtonLink to="/accounts?status=open" variant="ghost" size="sm">
+                    <ButtonLink to="/accounts?overdue=1&type=payable" variant="ghost" size="sm">
                       Ver todos
                     </ButtonLink>
                   </div>

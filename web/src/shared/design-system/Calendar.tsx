@@ -11,10 +11,9 @@ import {
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
-const monthFormatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
-
-function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1)
+function formatCalendarMonth(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${month}/${date.getFullYear()}`
 }
 
 export interface CalendarProps {
@@ -37,7 +36,7 @@ export function Calendar({ value, onSelect, min, max, className }: CalendarProps
   }, [value])
 
   const weeks = useMemo(() => getCalendarWeeks(viewDate), [viewDate])
-  const monthLabel = capitalize(monthFormatter.format(viewDate))
+  const monthLabel = formatCalendarMonth(viewDate)
 
   const shiftMonth = (amount: number) => {
     setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1))

@@ -44,6 +44,7 @@ class AccountController extends ApiController
                 'search',
                 'type',
                 'status',
+                'overdue',
                 'cost_center_id',
                 'category_id',
                 'due_from',

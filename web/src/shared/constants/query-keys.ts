@@ -87,6 +87,7 @@ export const queryKeys = {
 export interface AccountListParams extends ListParams {
   type?: string
   status?: string
+  overdue?: boolean | string
   cost_center_id?: string
   category_id?: string
   due_from?: string

@@ -15,6 +15,8 @@ import { PayablesReportViewer, PayablesViewButton } from '../components/Payables
 import { buildProvisionMatrixHtml } from '../utils/provision-html-export'
 import { buildCategoryMatrixHtml } from '../utils/category-html-export'
 import { buildMonthlySummaryHtml } from '../utils/monthly-summary-html-export'
+import { useColumnTableState } from '../hooks/useColumnTableState'
+import { applyColumnTableState } from '../utils/column-table'
 import {
   Badge,
   Button,
@@ -44,7 +46,6 @@ import {
   useWeeklyReport,
 } from '../hooks/useReports'
 import type {
-  CategoryCostCenterGroup,
   CostCenterReportRow,
   DailyCostCenterGroup,
   PayableAccount,
@@ -116,10 +117,36 @@ function DailySection() {
   const [date, setDate] = useState(today)
   const [costCenterId, setCostCenterId] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'value', direction: 'desc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
   const query = useDailyReport({ date, cost_center_id: costCenterId || undefined })
 
   type MovementRow = NonNullable<typeof query.data>['payments'][number]
+
+  const movementAccessors = {
+    description: (row: MovementRow) => row.description,
+    category: (row: MovementRow) => row.category ?? '',
+    value: (row: MovementRow) => row.value,
+  }
+
+  const movementTableColumns: Array<Column<MovementRow>> = [
+    {
+      key: 'description',
+      header: renderColumnHeader('description', 'Descrição', { placeholder: 'Filtrar…' }),
+      render: (row) => <span className="font-medium text-foreground">{row.description}</span>,
+    },
+    {
+      key: 'category',
+      header: renderColumnHeader('category', 'Categoria', { placeholder: 'Filtrar…' }),
+      render: (row) => <span className="text-muted">{row.category ?? '—'}</span>,
+    },
+    {
+      key: 'value',
+      header: renderColumnHeader('value', 'Valor', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.value)}</span>,
+    },
+  ]
 
   const movementColumns: ScreenReportColumn<MovementRow>[] = [
     { key: 'description', header: 'Descrição', cell: (row) => row.description },
@@ -127,7 +154,14 @@ function DailySection() {
     { key: 'value', header: 'Valor', align: 'right', cell: (row) => formatCurrency(row.value) },
   ]
 
-  const dailyGroups = query.data?.groups ?? []
+  const dailyGroups = (query.data?.groups ?? [])
+    .map((group) => ({
+      ...group,
+      payments: applyColumnTableState(group.payments, columnState, movementAccessors),
+      receipts: applyColumnTableState(group.receipts, columnState, movementAccessors),
+    }))
+    .filter((group) => group.payments.length > 0 || group.receipts.length > 0)
+
   const movementHeaders = ['Descrição', 'Categoria', 'Valor']
   const movementRows = (items: MovementRow[]) =>
     items.map((item) => [item.description, item.category ?? '—', formatCurrency(item.value)])
@@ -201,7 +235,7 @@ function DailySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             variant="single"
             from={date}
@@ -249,7 +283,7 @@ function DailySection() {
                 <EmptyState icon={BarChart3} title="Sem movimentações no dia" />
               ) : (
                 dailyGroups.map((group) => (
-                  <DailyCostCenterBlock key={group.cost_center} group={group} />
+                  <DailyCostCenterBlock key={group.cost_center} group={group} columns={movementTableColumns} />
                 ))
               )}
             </div>
@@ -280,10 +314,20 @@ function WeeklySection() {
   const [to, setTo] = useState('')
   const [costCenterId, setCostCenterId] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'total_paid', direction: 'desc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
   const query = useWeeklyReport({ from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined })
 
   type WeeklyGroupRow = WeeklyCostCenterGroup
+
+  const weeklyAccessors = {
+    cost_center: (row: WeeklyGroupRow) => row.cost_center,
+    total_paid: (row: WeeklyGroupRow) => row.total_paid,
+    total_received: (row: WeeklyGroupRow) => row.total_received,
+    net_balance: (row: WeeklyGroupRow) => row.net_balance,
+  }
+
+  const weeklyGroups = applyColumnTableState(query.data?.groups ?? [], columnState, weeklyAccessors)
 
   const weeklyColumns: ScreenReportColumn<WeeklyGroupRow>[] = [
     { key: 'cost_center', header: 'Centro de custo', cell: (row) => row.cost_center },
@@ -291,8 +335,6 @@ function WeeklySection() {
     { key: 'total_received', header: 'Total recebido', align: 'right', cell: (row) => formatCurrency(row.total_received) },
     { key: 'net_balance', header: 'Saldo líquido', align: 'right', cell: (row) => formatCurrency(row.net_balance) },
   ]
-
-  const weeklyGroups = query.data?.groups ?? []
 
   const periodLabel =
     query.data?.from && query.data?.to
@@ -306,7 +348,7 @@ function WeeklySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -360,10 +402,29 @@ function WeeklySection() {
         {!query.isPending && (
           <DataTable
             columns={[
-              { key: 'cost_center', header: 'Centro de custo', render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span> },
-              { key: 'total_paid', header: 'Total pago', render: (row) => <span className="text-danger">{formatCurrency(row.total_paid)}</span> },
-              { key: 'total_received', header: 'Total recebido', render: (row) => <span className="text-success">{formatCurrency(row.total_received)}</span> },
-              { key: 'net_balance', header: 'Saldo líquido', render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.net_balance)}</span> },
+              {
+                key: 'cost_center',
+                header: renderColumnHeader('cost_center', 'Centro de custo', { placeholder: 'Filtrar…' }),
+                render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span>,
+              },
+              {
+                key: 'total_paid',
+                header: renderColumnHeader('total_paid', 'Total pago', { align: 'end', variant: 'range' }),
+                className: 'text-right',
+                render: (row) => <span className="text-danger">{formatCurrency(row.total_paid)}</span>,
+              },
+              {
+                key: 'total_received',
+                header: renderColumnHeader('total_received', 'Total recebido', { align: 'end', variant: 'range' }),
+                className: 'text-right',
+                render: (row) => <span className="text-success">{formatCurrency(row.total_received)}</span>,
+              },
+              {
+                key: 'net_balance',
+                header: renderColumnHeader('net_balance', 'Saldo líquido', { align: 'end', variant: 'range' }),
+                className: 'text-right',
+                render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.net_balance)}</span>,
+              },
             ]}
             rows={weeklyGroups}
             rowKey={(row) => row.cost_center}
@@ -425,7 +486,7 @@ function ProvisionSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -478,12 +539,34 @@ function CategorySection() {
   const [to, setTo] = useState('')
   const [costCenterId, setCostCenterId] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'total', direction: 'desc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
   const query = useCategoryReport({
     from: from || undefined,
     to: to || undefined,
     cost_center_id: costCenterId || undefined,
   })
+
+  type CategoryRow = { category: string; total: number }
+
+  const categoryAccessors = {
+    category: (row: CategoryRow) => row.category,
+    total: (row: CategoryRow) => row.total,
+  }
+
+  const categoryTableColumns: Array<Column<CategoryRow>> = [
+    {
+      key: 'category',
+      header: renderColumnHeader('category', 'Categoria', { placeholder: 'Filtrar…' }),
+      render: (row) => <span className="text-sm text-foreground">{row.category}</span>,
+    },
+    {
+      key: 'total',
+      header: renderColumnHeader('total', 'Valor', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (row) => <span className="text-sm font-medium text-danger">{formatCurrency(row.total)}</span>,
+    },
+  ]
 
   const periodLabel =
     query.data?.from && query.data?.to
@@ -492,7 +575,13 @@ function CategorySection() {
         ? `${formatDate(from)} até ${formatDate(to)}`
         : 'Período não definido'
 
-  const categoryGroups = query.data?.groups ?? []
+  const categoryGroups = (query.data?.groups ?? [])
+    .map((group) => ({
+      ...group,
+      expense: applyColumnTableState(group.expense, columnState, categoryAccessors),
+    }))
+    .filter((group) => group.expense.length > 0)
+
   const matrix = query.data?.matrix
   const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
   const hasMatrixData = (matrix?.groups.length ?? 0) > 0
@@ -509,7 +598,7 @@ function CategorySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -538,7 +627,15 @@ function CategorySection() {
                 <EmptyState icon={BarChart3} title="Sem dados no período" />
               ) : (
                 categoryGroups.map((group) => (
-                  <CategoryCostCenterBlock key={group.cost_center} group={group} />
+                  <div key={group.cost_center}>
+                    <ReportGroupHeader title={group.cost_center} subtitle={`Despesas: ${formatCurrency(group.total_expense)}`} />
+                    <DataTable
+                      columns={categoryTableColumns}
+                      rows={group.expense}
+                      rowKey={(row) => row.category}
+                      emptyState={<EmptyState icon={BarChart3} title="Nenhum dado no período" />}
+                    />
+                  </div>
                 ))
               )}
             </div>
@@ -588,7 +685,7 @@ function MonthlySummarySection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -642,17 +739,50 @@ function MonthlySummarySection() {
 function CostCenterSection() {
   const [costCenterId, setCostCenterId] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'expense', direction: 'desc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
   const query = useCostCenterReport({ cost_center_id: costCenterId || undefined })
 
-  const rows = query.data?.rows ?? []
+  const accessors = {
+    cost_center: (row: CostCenterReportRow) => row.cost_center,
+    initial_balance: (row: CostCenterReportRow) => row.initial_balance,
+    income: (row: CostCenterReportRow) => row.income,
+    expense: (row: CostCenterReportRow) => row.expense,
+    balance: (row: CostCenterReportRow) => row.balance,
+  }
+
+  const rows = applyColumnTableState(query.data?.rows ?? [], columnState, accessors)
 
   const columns: Array<Column<CostCenterReportRow>> = [
-    { key: 'name', header: 'Centro de custo', render: (r) => <span className="font-medium text-foreground">{r.cost_center}</span> },
-    { key: 'initial', header: 'Saldo inicial', render: (r) => <span className="text-muted">{formatCurrency(r.initial_balance)}</span> },
-    { key: 'income', header: 'Entradas', render: (r) => <span className="text-success">{formatCurrency(r.income)}</span> },
-    { key: 'expense', header: 'Saídas', render: (r) => <span className="text-danger">{formatCurrency(r.expense)}</span> },
-    { key: 'balance', header: 'Saldo', render: (r) => <span className="font-medium text-foreground">{formatCurrency(r.balance)}</span> },
+    {
+      key: 'name',
+      header: renderColumnHeader('cost_center', 'Centro de custo', { placeholder: 'Filtrar…' }),
+      render: (r) => <span className="font-medium text-foreground">{r.cost_center}</span>,
+    },
+    {
+      key: 'initial',
+      header: renderColumnHeader('initial_balance', 'Saldo inicial', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (r) => <span className="text-muted">{formatCurrency(r.initial_balance)}</span>,
+    },
+    {
+      key: 'income',
+      header: renderColumnHeader('income', 'Entradas', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (r) => <span className="text-success">{formatCurrency(r.income)}</span>,
+    },
+    {
+      key: 'expense',
+      header: renderColumnHeader('expense', 'Saídas', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (r) => <span className="text-danger">{formatCurrency(r.expense)}</span>,
+    },
+    {
+      key: 'balance',
+      header: renderColumnHeader('balance', 'Saldo', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (r) => <span className="font-medium text-foreground">{formatCurrency(r.balance)}</span>,
+    },
   ]
 
   const screenColumns: ScreenReportColumn<CostCenterReportRow>[] = [
@@ -675,8 +805,10 @@ function CostCenterSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <CostCenterFilter value={costCenterId} onChange={setCostCenterId} />
+          </div>
           {!query.isPending && (
             <div className="flex flex-wrap justify-end gap-2">
               <ReportViewButton onClick={() => setViewerOpen(true)} />
@@ -751,6 +883,7 @@ function CashFlowSection() {
   const [days, setDays] = useState(30)
   const [costCenterId, setCostCenterId] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'realized_net', direction: 'desc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
 
   const query = useCashFlowStatement({
@@ -760,16 +893,44 @@ function CashFlowSection() {
     cost_center_id: costCenterId || undefined,
   })
 
-  const cashFlowGroups = query.data?.groups ?? []
+  type CashFlowGroupRow = NonNullable<typeof query.data>['groups'][number]
 
-  const cashFlowGroupColumns: Array<Column<(typeof cashFlowGroups)[number]>> = [
-    { key: 'cost_center', header: 'Centro de custo', render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span> },
-    { key: 'realized_net', header: 'Resultado realizado', render: (row) => <span className="text-foreground">{formatCurrency(row.realized_net)}</span> },
-    { key: 'projected_net', header: 'Resultado projetado', render: (row) => <span className="text-foreground">{formatCurrency(row.projected_net)}</span> },
-    { key: 'expected_final_balance', header: 'Saldo final esperado', render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.expected_final_balance)}</span> },
+  const accessors = {
+    cost_center: (row: CashFlowGroupRow) => row.cost_center,
+    realized_net: (row: CashFlowGroupRow) => row.realized_net,
+    projected_net: (row: CashFlowGroupRow) => row.projected_net,
+    expected_final_balance: (row: CashFlowGroupRow) => row.expected_final_balance,
+  }
+
+  const cashFlowGroups = applyColumnTableState(query.data?.groups ?? [], columnState, accessors)
+
+  const cashFlowGroupColumns: Array<Column<CashFlowGroupRow>> = [
+    {
+      key: 'cost_center',
+      header: renderColumnHeader('cost_center', 'Centro de custo', { placeholder: 'Filtrar…' }),
+      render: (row) => <span className="font-medium text-foreground">{row.cost_center}</span>,
+    },
+    {
+      key: 'realized_net',
+      header: renderColumnHeader('realized_net', 'Resultado realizado', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (row) => <span className="text-foreground">{formatCurrency(row.realized_net)}</span>,
+    },
+    {
+      key: 'projected_net',
+      header: renderColumnHeader('projected_net', 'Resultado projetado', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (row) => <span className="text-foreground">{formatCurrency(row.projected_net)}</span>,
+    },
+    {
+      key: 'expected_final_balance',
+      header: renderColumnHeader('expected_final_balance', 'Saldo final esperado', { align: 'end', variant: 'range' }),
+      className: 'text-right',
+      render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.expected_final_balance)}</span>,
+    },
   ]
 
-  const cashFlowGroupScreenColumns: ScreenReportColumn<(typeof cashFlowGroups)[number]>[] = [
+  const cashFlowGroupScreenColumns: ScreenReportColumn<CashFlowGroupRow>[] = [
     { key: 'cost_center', header: 'Centro de custo', cell: (row) => row.cost_center },
     { key: 'realized_net', header: 'Resultado realizado', align: 'right', cell: (row) => formatCurrency(row.realized_net) },
     { key: 'projected_net', header: 'Resultado projetado', align: 'right', cell: (row) => formatCurrency(row.projected_net) },
@@ -786,7 +947,7 @@ function CashFlowSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -795,7 +956,6 @@ function CashFlowSection() {
               setTo(nextTo)
             }}
           />
-          <div className="flex flex-wrap items-center gap-2">
           <Select
             aria-label="Projeção"
             className="w-40"
@@ -839,7 +999,6 @@ function CashFlowSection() {
               />
             </>
           )}
-          </div>
         </div>
 
         {query.isPending ? (
@@ -895,6 +1054,7 @@ function PayablesSection() {
   const [costCenterId, setCostCenterId] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { columnState, renderColumnHeader } = useColumnTableState({ key: 'due_date', direction: 'asc' })
   const costCenterLabel = useCostCenterLabel(costCenterId)
 
   const query = usePayablesReport({
@@ -903,9 +1063,23 @@ function PayablesSection() {
     cost_center_id: costCenterId || undefined,
   })
 
+  const payableAccessors = {
+    due_date: (account: PayableAccount) => account.due_date,
+    description: (account: PayableAccount) => account.description,
+    counterparty: (account: PayableAccount) => account.counterparty ?? '',
+    category: (account: PayableAccount) => account.category ?? '',
+    installment: (account: PayableAccount) => account.installment ?? '',
+    remaining_amount: (account: PayableAccount) => account.remaining_amount,
+  }
+
   const data = query.data
-  const accounts = data?.accounts ?? []
-  const groups = data?.groups ?? []
+  const accounts = applyColumnTableState(data?.accounts ?? [], columnState, payableAccessors)
+  const groups = (data?.groups ?? [])
+    .map((group) => ({
+      ...group,
+      accounts: applyColumnTableState(group.accounts, columnState, payableAccessors),
+    }))
+    .filter((group) => group.accounts.length > 0)
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -990,36 +1164,44 @@ function PayablesSection() {
       },
       {
         key: 'due_date',
-        header: 'Vencimento',
+        header: renderColumnHeader('due_date', 'Data', { placeholder: 'Filtrar…' }),
+        className: 'w-28',
         render: (account) => (
-          <span className={isPayablesReportOverdue(account, selected) ? 'font-medium text-danger' : selected.has(account.id) ? 'font-medium text-success' : 'text-muted'}>
+          <span className={`tabular-nums ${isPayablesReportOverdue(account, selected) ? 'font-medium text-danger' : selected.has(account.id) ? 'font-medium text-success' : 'text-muted'}`}>
             {formatShortDate(account.due_date)}
           </span>
         ),
       },
       {
         key: 'description',
-        header: 'Descrição',
+        header: renderColumnHeader('description', 'Descrição', { placeholder: 'Filtrar…' }),
         render: (account) => (
-          <span className="whitespace-nowrap font-medium text-foreground">{account.description}</span>
+          <span className="font-medium text-foreground">{account.description}</span>
         ),
       },
       {
+        key: 'counterparty',
+        header: renderColumnHeader('counterparty', 'Fornecedor', { placeholder: 'Filtrar…' }),
+        render: (account) => <span className="text-muted">{account.counterparty ?? '—'}</span>,
+      },
+      {
         key: 'category',
-        header: 'Categoria',
-        render: (account) => <span className="whitespace-nowrap text-muted">{account.category ?? '—'}</span>,
+        header: renderColumnHeader('category', 'Categoria', { placeholder: 'Filtrar…' }),
+        render: (account) => <span className="text-muted">{account.category ?? '—'}</span>,
       },
       {
         key: 'installment',
-        header: 'Parcela',
+        header: renderColumnHeader('installment', 'Parcela', { placeholder: 'Filtrar…' }),
+        className: 'w-24',
         render: (account) =>
           account.installment ? <Badge variant="neutral">{account.installment}</Badge> : <span className="text-muted">—</span>,
       },
       {
         key: 'value',
-        header: 'Valor',
+        header: renderColumnHeader('remaining_amount', 'Valor', { align: 'end', variant: 'range' }),
+        className: 'w-32 text-right',
         render: (account) => (
-          <span className="whitespace-nowrap font-medium text-foreground">{formatCurrency(account.remaining_amount)}</span>
+          <span className="block text-right font-medium tabular-nums text-foreground">{formatCurrency(account.remaining_amount)}</span>
         ),
       },
     ]
@@ -1028,7 +1210,7 @@ function PayablesSection() {
   return (
     <Card>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-start gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangeFilter
             from={from}
             to={to}
@@ -1119,19 +1301,13 @@ function Summary({ label, value, accent = 'text-foreground' }: { label: string; 
   )
 }
 
-function DailyCostCenterBlock({ group }: { group: DailyCostCenterGroup }) {
-  type MovementRow = DailyCostCenterGroup['payments'][number]
-
-  const columns: Array<Column<MovementRow>> = [
-    { key: 'description', header: 'Descrição', render: (row) => <span className="font-medium text-foreground">{row.description}</span> },
-    { key: 'category', header: 'Categoria', render: (row) => <span className="text-muted">{row.category ?? '—'}</span> },
-    {
-      key: 'value',
-      header: 'Valor',
-      render: (row) => <span className="font-medium text-foreground">{formatCurrency(row.value)}</span>,
-    },
-  ]
-
+function DailyCostCenterBlock({
+  group,
+  columns,
+}: {
+  group: DailyCostCenterGroup
+  columns: Array<Column<DailyCostCenterGroup['payments'][number]>>
+}) {
   return (
     <div>
       <ReportGroupHeader
@@ -1155,35 +1331,6 @@ function DailyCostCenterBlock({ group }: { group: DailyCostCenterGroup }) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function CategoryCostCenterBlock({ group }: { group: CategoryCostCenterGroup }) {
-  return (
-    <div>
-      <ReportGroupHeader title={group.cost_center} subtitle={`Despesas: ${formatCurrency(group.total_expense)}`} />
-      <CategoryColumn title="Despesas" rows={group.expense} accent="text-danger" />
-    </div>
-  )
-}
-
-function CategoryColumn({ title, rows, accent }: { title: string; rows: Array<{ category: string; total: number }>; accent: string }) {
-  return (
-    <div>
-      <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">Nenhum dado no período.</p>
-      ) : (
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <div key={row.category} className="flex items-center justify-between rounded-lg bg-surface-2/60 px-3 py-2">
-              <span className="text-sm text-foreground">{row.category}</span>
-              <span className={`text-sm font-medium ${accent}`}>{formatCurrency(row.total)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

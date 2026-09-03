@@ -8,11 +8,12 @@ interface PayablesReportLayoutProps {
   className?: string
 }
 
-const HEADERS = ['Vencimento', 'Descrição', 'Categoria', 'Valor'] as const
+const HEADERS = ['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'] as const
+const COL_WIDTHS = ['12%', '34%', '22%', '18%', '14%'] as const
 
 export function PayablesReportLayout({ data, compact = false, className }: PayablesReportLayoutProps) {
-  const cellClass = compact ? 'whitespace-nowrap px-2 py-1 text-[11px]' : 'whitespace-nowrap px-4 py-2 text-sm'
-  const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-4 py-2.5 text-xs'
+  const cellClass = compact ? 'px-2 py-1 text-[11px]' : 'px-3 py-2 text-sm'
+  const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-3 py-2.5 text-xs'
   const referenceDate = formatShortDate(data.reference_date)
 
   return (
@@ -23,9 +24,14 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
             {group.cost_center}
           </div>
 
-          <table className="min-w-full border-collapse">
+          <table className="w-full table-fixed border-collapse">
+            <colgroup>
+              {COL_WIDTHS.map((width, index) => (
+                <col key={HEADERS[index]} style={{ width }} />
+              ))}
+            </colgroup>
             <thead>
-              <tr className="border-b border-surface-3 bg-surface-2/50 text-left uppercase tracking-wide text-muted">
+              <tr className="border-b border-surface-3 bg-surface-2/50 uppercase tracking-wide text-muted">
                 {HEADERS.map((header, index) => (
                   <th
                     key={header}
@@ -48,7 +54,7 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
                     <AccountRow key={account.id} account={account} cellClass={cellClass} />
                   ))}
                   <TotalRow
-                    colSpan={3}
+                    colSpan={4}
                     label="TOTAL EM ATRASO"
                     value={group.overdue.total}
                     cellClass={cellClass}
@@ -69,7 +75,7 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
                   {group.due_today.accounts.map((account) => (
                     <AccountRow key={account.id} account={account} cellClass={cellClass} />
                   ))}
-                  <TotalRow colSpan={3} label="TOTAL PAGO" value={group.due_today.total} cellClass={cellClass} tone="success" />
+                  <TotalRow colSpan={4} label="TOTAL PAGO" value={group.due_today.total} cellClass={cellClass} tone="success" />
                 </>
               )}
             </tbody>
@@ -115,10 +121,13 @@ function SectionTitle({
 function AccountRow({ account, cellClass }: { account: PayableAccount; cellClass: string }) {
   return (
     <tr className="border-b border-surface-3/60 text-foreground">
-      <td className={cellClass}>{formatShortDate(account.due_date)}</td>
+      <td className={cn(cellClass, 'whitespace-nowrap text-left tabular-nums')}>{formatShortDate(account.due_date)}</td>
       <td className={cn(cellClass, 'text-left')}>{account.description}</td>
+      <td className={cn(cellClass, 'text-left text-muted')}>{account.counterparty ?? '—'}</td>
       <td className={cn(cellClass, 'text-left text-muted')}>{account.category ?? '—'}</td>
-      <td className={cn(cellClass, 'text-right font-medium tabular-nums')}>{formatCurrency(account.remaining_amount)}</td>
+      <td className={cn(cellClass, 'whitespace-nowrap text-right font-medium tabular-nums')}>
+        {formatCurrency(account.remaining_amount)}
+      </td>
     </tr>
   )
 }
@@ -143,7 +152,7 @@ function TotalRow({
       <td colSpan={colSpan} className={cn(cellClass, 'uppercase')}>
         {label}
       </td>
-      <td className={cn(cellClass, 'text-right tabular-nums')}>{formatCurrency(value)}</td>
+      <td className={cn(cellClass, 'whitespace-nowrap text-right tabular-nums')}>{formatCurrency(value)}</td>
     </tr>
   )
 }
@@ -157,8 +166,8 @@ function GeneralSummary({
   compact: boolean
   referenceDate: string
 }) {
-  const cellClass = compact ? 'whitespace-nowrap px-2 py-1 text-[11px]' : 'whitespace-nowrap px-4 py-2 text-sm'
-  const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-4 py-2.5 text-xs'
+  const cellClass = compact ? 'px-2 py-1 text-[11px]' : 'px-3 py-2 text-sm'
+  const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-3 py-2.5 text-xs'
 
   return (
     <section className="overflow-x-auto rounded-xl border-2 border-surface-3 bg-surface-2/30 p-4">
@@ -212,10 +221,14 @@ function SummaryTable({
   return (
     <div className="overflow-x-auto">
       <p className={cn('mb-2 font-bold uppercase', toneClass, headerClass)}>{title}</p>
-      <table className="min-w-full border-collapse">
+      <table className="w-full table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: '70%' }} />
+          <col style={{ width: '30%' }} />
+        </colgroup>
         <thead>
-          <tr className="border-b border-surface-3 text-left uppercase tracking-wide text-muted">
-            <th className={cn(headerClass, 'font-semibold')}>Centro de custo</th>
+          <tr className="border-b border-surface-3 uppercase tracking-wide text-muted">
+            <th className={cn(headerClass, 'text-left font-semibold')}>Centro de custo</th>
             <th className={cn(headerClass, 'text-right font-semibold')}>Valor</th>
           </tr>
         </thead>
@@ -223,12 +236,14 @@ function SummaryTable({
           {rows.map((row) => (
             <tr key={row.cost_center} className="border-b border-surface-3/60">
               <td className={cn(cellClass, 'text-left text-foreground')}>{row.cost_center}</td>
-              <td className={cn(cellClass, 'text-right tabular-nums text-foreground')}>{formatCurrency(row.amount)}</td>
+              <td className={cn(cellClass, 'whitespace-nowrap text-right tabular-nums text-foreground')}>
+                {formatCurrency(row.amount)}
+              </td>
             </tr>
           ))}
           <tr className={cn('font-bold', toneClass)}>
             <td className={cn(cellClass, 'uppercase')}>{totalLabel}</td>
-            <td className={cn(cellClass, 'text-right tabular-nums')}>{formatCurrency(total)}</td>
+            <td className={cn(cellClass, 'whitespace-nowrap text-right tabular-nums')}>{formatCurrency(total)}</td>
           </tr>
         </tbody>
       </table>

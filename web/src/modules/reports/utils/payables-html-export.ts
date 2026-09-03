@@ -1,4 +1,5 @@
 import { formatCurrency, formatShortDate } from '@/shared/utils/format'
+import { escapeHtml } from '@/shared/utils/report-export'
 import type { PayableAccount, PayablesExportReport, PayablesReport } from '../services/reports.service'
 import { isPayablesReportOverdue } from './payables-report'
 
@@ -82,13 +83,14 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-function rowHtml(cells: string[], alignments: Array<'left' | 'right'>): string {
-  return `<tr>${cells
-    .map(
-      (value, index) =>
-        `<td style="padding:6px 8px;text-align:${alignments[index] ?? 'left'};border-bottom:1px solid #e5e7eb;white-space:nowrap;">${value}</td>`,
-    )
-    .join('')}</tr>`
+function accountRow(account: PayableAccount): string {
+  return `<tr>
+    <td>${escapeHtml(formatShortDate(account.due_date))}</td>
+    <td>${escapeHtml(account.description)}</td>
+    <td>${escapeHtml(account.counterparty ?? '—')}</td>
+    <td>${escapeHtml(account.category ?? '—')}</td>
+    <td class="amount">${escapeHtml(formatCurrency(account.remaining_amount))}</td>
+  </tr>`
 }
 
 export function buildPayablesReportHtml(data: PayablesExportReport, title: string, subtitle: string): string {
@@ -96,123 +98,93 @@ export function buildPayablesReportHtml(data: PayablesExportReport, title: strin
   const sections: string[] = []
 
   for (const group of data.groups) {
+    sections.push(`<tr class="section-banner"><td colspan="5">${escapeHtml(group.cost_center)}</td></tr>`)
     sections.push(
-      `<tr><td colspan="4" style="padding:10px 8px;font-weight:700;background:#e5e7eb;text-transform:uppercase;">${group.cost_center}</td></tr>`,
-    )
-    sections.push(
-      rowHtml(['Vencimento', 'Descrição', 'Categoria', 'Valor'], ['left', 'left', 'left', 'right']).replace(
-        '<tr>',
-        '<tr style="background:#f9fafb;font-size:10px;text-transform:uppercase;color:#6b7280;">',
-      ),
+      `<tr class="column-header">
+        <th>Data</th>
+        <th>Descrição</th>
+        <th>Fornecedor</th>
+        <th>Categoria</th>
+        <th class="amount">Valor</th>
+      </tr>`,
     )
 
     if (group.overdue.accounts.length > 0) {
-      sections.push(
-        `<tr><td colspan="4" style="padding:8px;font-weight:700;color:#dc2626;text-transform:uppercase;text-align:center;">EM ATRASO</td></tr>`,
-      )
-
+      sections.push(`<tr class="status-overdue"><td colspan="5">EM ATRASO</td></tr>`)
       for (const account of group.overdue.accounts) {
-        sections.push(
-          rowHtml(
-            [
-              formatShortDate(account.due_date),
-              account.description,
-              account.category ?? '—',
-              formatCurrency(account.remaining_amount),
-            ],
-            ['left', 'left', 'left', 'right'],
-          ),
-        )
+        sections.push(accountRow(account))
       }
-
       sections.push(
-        `<tr style="font-weight:700;color:#dc2626;background:#fef2f2;"><td colspan="3" style="padding:8px;text-transform:uppercase;">TOTAL EM ATRASO</td><td style="padding:8px;text-align:right;">${formatCurrency(group.overdue.total)}</td></tr>`,
+        `<tr class="total-overdue"><td colspan="4">TOTAL EM ATRASO</td><td class="amount">${escapeHtml(formatCurrency(group.overdue.total))}</td></tr>`,
       )
     }
 
     if (group.due_today.accounts.length > 0) {
       sections.push(
-        `<tr><td colspan="4" style="padding:8px;font-weight:700;color:#15803d;text-transform:uppercase;text-align:center;">PAGOS EM ${referenceDate}</td></tr>`,
+        `<tr class="status-paid"><td colspan="5">PAGOS EM ${escapeHtml(referenceDate)}</td></tr>`,
       )
-
       for (const account of group.due_today.accounts) {
-        sections.push(
-          rowHtml(
-            [
-              formatShortDate(account.due_date),
-              account.description,
-              account.category ?? '—',
-              formatCurrency(account.remaining_amount),
-            ],
-            ['left', 'left', 'left', 'right'],
-          ),
-        )
+        sections.push(accountRow(account))
       }
-
       sections.push(
-        `<tr style="font-weight:700;color:#15803d;background:#f0fdf4;"><td colspan="3" style="padding:8px;text-transform:uppercase;">TOTAL PAGO</td><td style="padding:8px;text-align:right;">${formatCurrency(group.due_today.total)}</td></tr>`,
+        `<tr class="total-paid"><td colspan="4">TOTAL PAGO</td><td class="amount">${escapeHtml(formatCurrency(group.due_today.total))}</td></tr>`,
       )
     }
 
-    sections.push('<tr><td colspan="4" style="height:12px;"></td></tr>')
+    sections.push('<tr class="spacer"><td colspan="5"></td></tr>')
   }
 
   const paidSummaryRows = data.summary.paid_today.rows
     .map(
       (row) =>
-        `<tr><td style="padding:6px 8px;">${row.cost_center}</td><td style="padding:6px 8px;text-align:right;">${formatCurrency(row.amount)}</td></tr>`,
+        `<tr><td>${escapeHtml(row.cost_center)}</td><td class="amount">${escapeHtml(formatCurrency(row.amount))}</td></tr>`,
     )
     .join('')
 
   const overdueSummaryRows = data.summary.overdue.rows
     .map(
       (row) =>
-        `<tr><td style="padding:6px 8px;">${row.cost_center}</td><td style="padding:6px 8px;text-align:right;">${formatCurrency(row.amount)}</td></tr>`,
+        `<tr><td>${escapeHtml(row.cost_center)}</td><td class="amount">${escapeHtml(formatCurrency(row.amount))}</td></tr>`,
     )
     .join('')
 
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>${title}</title>
-  <style>
-    body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
-    h1 { font-size: 18px; margin: 0 0 4px; }
-    p { margin: 0 0 16px; color: #4b5563; font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
-    .summary-box { border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; }
-    .summary-title { font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
-  </style>
-</head>
-<body>
-  <h1>${title}</h1>
-  <p>${subtitle}</p>
-  <table>
-    <tbody>${sections.join('')}</tbody>
-  </table>
-  <h2 style="text-align:center;font-size:13px;font-weight:700;text-transform:uppercase;margin:24px 0 16px;">Resumo geral em ${referenceDate}</h2>
-  <div class="summary-grid">
-    <div class="summary-box">
-      <div class="summary-title" style="color:#15803d;">${data.summary.paid_today.title}</div>
-      <table style="width:100%;">
-        <thead><tr><th style="text-align:left;padding:6px 8px;">Centro de custo</th><th style="text-align:right;padding:6px 8px;">Valor</th></tr></thead>
-        <tbody>${paidSummaryRows}
-          <tr style="font-weight:700;color:#15803d;"><td style="padding:8px;">TOTAL PAGOS</td><td style="padding:8px;text-align:right;">${formatCurrency(data.summary.paid_today.total)}</td></tr>
-        </tbody>
-      </table>
+  const subtitleLines = subtitle
+    .split(' · ')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return `
+    <h1 class="report-title">${escapeHtml(title)}</h1>
+    ${subtitleLines.map((line) => `<p class="report-subtitle">${escapeHtml(line)}</p>`).join('')}
+    <table class="report-table">
+      <tbody>${sections.join('')}</tbody>
+    </table>
+    <h2 class="summary-heading">Resumo geral em ${escapeHtml(referenceDate)}</h2>
+    <div class="summary-grid">
+      <div class="summary-box">
+        <div class="summary-title is-success">${escapeHtml(data.summary.paid_today.title)}</div>
+        <table class="report-table" style="margin:0">
+          <thead>
+            <tr class="column-header"><th>Centro de custo</th><th class="amount">Valor</th></tr>
+          </thead>
+          <tbody>
+            ${paidSummaryRows}
+            <tr class="total-paid"><td>TOTAL PAGOS</td><td class="amount">${escapeHtml(formatCurrency(data.summary.paid_today.total))}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="summary-box">
+        <div class="summary-title is-danger">Em atraso</div>
+        <table class="report-table" style="margin:0">
+          <thead>
+            <tr class="column-header"><th>Centro de custo</th><th class="amount">Valor</th></tr>
+          </thead>
+          <tbody>
+            ${overdueSummaryRows}
+            <tr class="total-overdue"><td>TOTAL EM ATRASO</td><td class="amount">${escapeHtml(formatCurrency(data.summary.overdue.total))}</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div class="summary-box">
-      <div class="summary-title" style="color:#dc2626;">Em atraso</div>
-      <table style="width:100%;">
-        <thead><tr><th style="text-align:left;padding:6px 8px;">Centro de custo</th><th style="text-align:right;padding:6px 8px;">Valor</th></tr></thead>
-        <tbody>${overdueSummaryRows}
-          <tr style="font-weight:700;color:#dc2626;"><td style="padding:8px;">TOTAL EM ATRASO</td><td style="padding:8px;text-align:right;">${formatCurrency(data.summary.overdue.total)}</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</body>
-</html>`
+  `
 }

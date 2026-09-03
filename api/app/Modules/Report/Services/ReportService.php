@@ -623,13 +623,13 @@ class ReportService
         foreach ($groupsMap as $group) {
             $categories = array_values($group['categories']);
 
-            usort($categories, fn (array $a, array $b): int => strcmp($a['category'], $b['category']));
+            usort($categories, fn (array $a, array $b): int => $b['subtotal']['total'] <=> $a['subtotal']['total']);
 
             foreach ($categories as &$category) {
                 $category['direct_rows'] = $this->finalizeCategoryMatrixRows($category['direct_rows']);
 
                 $subcategories = array_values($category['subcategories']);
-                usort($subcategories, fn (array $a, array $b): int => strcmp($a['subcategory'], $b['subcategory']));
+                usort($subcategories, fn (array $a, array $b): int => $b['subtotal']['total'] <=> $a['subtotal']['total']);
 
                 foreach ($subcategories as &$subcategory) {
                     $subcategory['rows'] = $this->finalizeCategoryMatrixRows($subcategory['rows']);
@@ -683,7 +683,7 @@ class ReportService
     {
         $rows = array_values($rowsMap);
 
-        usort($rows, fn (array $a, array $b): int => strcmp($a['label'], $b['label']));
+        usort($rows, fn (array $a, array $b): int => $b['total'] <=> $a['total'] ?: strcmp($a['label'], $b['label']));
 
         foreach ($rows as &$row) {
             $row['amounts'] = $this->normalizeMatrixAmounts($row['amounts']);
@@ -812,7 +812,7 @@ class ReportService
         }
 
         $rows = array_values($rowsMap);
-        usort($rows, fn (array $a, array $b): int => strcmp($a['cost_center'], $b['cost_center']));
+        usort($rows, fn (array $a, array $b): int => $b['total'] <=> $a['total'] ?: strcmp($a['cost_center'], $b['cost_center']));
 
         $grandAmounts = array_fill_keys($monthKeys, 0.0);
         $grandTotal = 0.0;
@@ -1032,7 +1032,7 @@ class ReportService
                     "Referência: {$referenceLabel}",
                 ],
             );
-            $columnCount = 4;
+            $columnCount = 5;
 
             foreach ($exportGroups as $group) {
                 $sheet->setCellValue("A{$row}", $group['cost_center']);
@@ -1047,7 +1047,7 @@ class ReportService
                     $row++;
 
                     $headerRow = $row;
-                    $sheet->fromArray(['Vencimento', 'Descrição', 'Categoria', 'Valor'], null, "A{$row}");
+                    $sheet->fromArray(['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'], null, "A{$row}");
                     $row++;
                     $dataStartRow = $row;
 
@@ -1055,6 +1055,7 @@ class ReportService
                         $sheet->fromArray([
                             Carbon::parse($account['due_date'])->format('d/m/Y'),
                             $account['description'],
+                            $account['counterparty'] ?? '',
                             $account['category'] ?? '',
                             $this->xlsxMoney($account['remaining_amount']),
                         ], null, "A{$row}");
@@ -1062,10 +1063,10 @@ class ReportService
                     }
 
                     $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount, 'FFF3F4F6');
-                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 3, false);
+                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 4, false);
 
                     $sheet->setCellValue("A{$row}", 'TOTAL EM ATRASO');
-                    $sheet->setCellValue('D'.$row, $this->xlsxMoney($group['overdue']['total']));
+                    $sheet->setCellValue('E'.$row, $this->xlsxMoney($group['overdue']['total']));
                     $this->applyXlsxFooterRow($sheet, $row, $columnCount);
                     $sheet->getStyle("A{$row}:{$this->xlsxColumnLetter($columnCount)}{$row}")->getFont()->getColor()->setARGB('FFFF0000');
                     $row += 2;
@@ -1079,7 +1080,7 @@ class ReportService
                     $row++;
 
                     $headerRow = $row;
-                    $sheet->fromArray(['Vencimento', 'Descrição', 'Categoria', 'Valor'], null, "A{$row}");
+                    $sheet->fromArray(['Data', 'Descrição', 'Fornecedor', 'Categoria', 'Valor'], null, "A{$row}");
                     $row++;
                     $dataStartRow = $row;
 
@@ -1087,6 +1088,7 @@ class ReportService
                         $sheet->fromArray([
                             Carbon::parse($account['due_date'])->format('d/m/Y'),
                             $account['description'],
+                            $account['counterparty'] ?? '',
                             $account['category'] ?? '',
                             $this->xlsxMoney($account['remaining_amount']),
                         ], null, "A{$row}");
@@ -1094,10 +1096,10 @@ class ReportService
                     }
 
                     $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount, 'FFF3F4F6');
-                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 3, false);
+                    $this->applyXlsxDataArea($sheet, $dataStartRow, $row - 1, $columnCount, 4, false);
 
                     $sheet->setCellValue("A{$row}", 'TOTAL PAGO');
-                    $sheet->setCellValue('D'.$row, $this->xlsxMoney($group['due_today']['total']));
+                    $sheet->setCellValue('E'.$row, $this->xlsxMoney($group['due_today']['total']));
                     $this->applyXlsxFooterRow($sheet, $row, $columnCount);
                     $sheet->getStyle("A{$row}:{$this->xlsxColumnLetter($columnCount)}{$row}")->getFont()->getColor()->setARGB('FF008000');
                     $row += 2;
@@ -1349,7 +1351,7 @@ class ReportService
             $groups[] = $group;
         }
 
-        usort($groups, fn ($a, $b) => strcmp($a['cost_center'], $b['cost_center']));
+        usort($groups, fn ($a, $b) => $b['total_paid'] <=> $a['total_paid'] ?: strcmp($a['cost_center'], $b['cost_center']));
 
         return $groups;
     }
@@ -1368,7 +1370,7 @@ class ReportService
             $groups[] = $group;
         }
 
-        usort($groups, fn ($a, $b) => strcmp($a['cost_center'], $b['cost_center']));
+        usort($groups, fn ($a, $b) => $b['total_expense'] <=> $a['total_expense'] ?: strcmp($a['cost_center'], $b['cost_center']));
 
         return $groups;
     }

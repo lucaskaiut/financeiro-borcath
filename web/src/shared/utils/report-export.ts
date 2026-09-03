@@ -1,3 +1,5 @@
+import { REPORT_PRINT_STYLES } from '@/modules/reports/utils/report-print-styles'
+
 export function escapeHtml(value: unknown): string {
   return String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char] ?? char)
 }
@@ -11,29 +13,23 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export function printHtmlReport(title: string, content: string): void {
-  const html = `<!doctype html>
+export function wrapReportPrintDocument(title: string, bodyHtml: string): string {
+  return `<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <title>${escapeHtml(title)}</title>
-    <style>
-      body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
-      h1 { font-size: 20px; margin-bottom: 4px; }
-      h2 { font-size: 15px; margin: 0 0 16px; font-weight: normal; color: #444; }
-      h3 { font-size: 13px; margin: 16px 0 8px; font-weight: bold; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-      th { background: #f3f3f3; }
-      td.amount { text-align: right; white-space: nowrap; }
-      .summary { margin-top: 24px; font-size: 13px; border-top: 2px solid #111; padding-top: 12px; }
-      .summary strong { font-size: 14px; }
-    </style>
+    <style>${REPORT_PRINT_STYLES}</style>
   </head>
   <body>
-    ${content}
+    ${bodyHtml}
   </body>
 </html>`
+}
+
+export function printHtmlReport(title: string, content: string): void {
+  const bodyHtml = looksLikeFullDocument(content) ? extractBodyHtml(content) : content
+  const html = wrapReportPrintDocument(title, bodyHtml)
 
   const win = window.open('', '_blank', 'width=900,height=700')
 
@@ -47,4 +43,13 @@ export function printHtmlReport(title: string, content: string): void {
   win.focus()
   win.addEventListener('afterprint', () => win.close())
   win.print()
+}
+
+function looksLikeFullDocument(content: string): boolean {
+  return /<!doctype html|<html[\s>]/i.test(content)
+}
+
+function extractBodyHtml(content: string): string {
+  const match = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+  return match?.[1]?.trim() || content
 }

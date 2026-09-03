@@ -71,6 +71,7 @@ export default function AccountsListPage() {
   const page = Number(searchParams.get('page') ?? 1)
   const type = searchParams.get('type') ?? ''
   const status = searchParams.get('status') ?? ''
+  const overdue = searchParams.get('overdue') === '1'
   const costCenterId = searchParams.get('cost_center_id') ?? ''
 
   useEffect(() => {
@@ -98,7 +99,8 @@ export default function AccountsListPage() {
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
     type: type || undefined,
-    status: status || undefined,
+    status: overdue ? undefined : status || undefined,
+    overdue: overdue || undefined,
     cost_center_id: costCenterId || undefined,
     due_from: dueFrom || undefined,
     due_to: dueTo || undefined,
@@ -106,7 +108,18 @@ export default function AccountsListPage() {
     paid_to: paidTo || undefined,
   })
 
-  const updateParams = (next: { page?: number; search?: string; type?: string; status?: string; cost_center_id?: string; due_from?: string; due_to?: string; paid_from?: string; paid_to?: string }) => {
+  const updateParams = (next: {
+    page?: number
+    search?: string
+    type?: string
+    status?: string
+    overdue?: string
+    cost_center_id?: string
+    due_from?: string
+    due_to?: string
+    paid_from?: string
+    paid_to?: string
+  }) => {
     setSearchParams((params) => {
       if (next.type !== undefined) {
         next.type ? params.set('type', next.type) : params.delete('type')
@@ -114,6 +127,16 @@ export default function AccountsListPage() {
       }
       if (next.status !== undefined) {
         next.status ? params.set('status', next.status) : params.delete('status')
+        if (next.status !== undefined) params.delete('overdue')
+        params.delete('page')
+      }
+      if (next.overdue !== undefined) {
+        if (next.overdue === '1') {
+          params.set('overdue', '1')
+          params.delete('status')
+        } else {
+          params.delete('overdue')
+        }
         params.delete('page')
       }
       if (next.cost_center_id !== undefined) {
@@ -284,10 +307,10 @@ export default function AccountsListPage() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => updateParams({ status: option.value })}
+                  onClick={() => updateParams({ status: option.value, overdue: '' })}
                   className={cn(
                     'rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors',
-                    status === option.value
+                    !overdue && status === option.value
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground',
                   )}
@@ -295,6 +318,18 @@ export default function AccountsListPage() {
                   {option.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => updateParams({ overdue: overdue ? '' : '1', status: '' })}
+                className={cn(
+                  'rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors',
+                  overdue
+                    ? 'bg-danger text-white'
+                    : 'bg-surface-2 text-muted hover:bg-surface-3 hover:text-foreground',
+                )}
+              >
+                Vencidos
+              </button>
             </div>
           </div>
 
