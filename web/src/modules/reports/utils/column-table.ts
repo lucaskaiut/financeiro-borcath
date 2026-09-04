@@ -185,3 +185,15 @@ export function clearColumnState(state: ColumnTableState, key: string): ColumnTa
 export function isColumnFilterActive(filter: ColumnFilter | undefined): boolean {
   return isFilterActive(filter)
 }
+
+/** Serializes column filters/sort for API `column_query` (JSON string). */
+export function toColumnQueryParam(state: ColumnTableState): string | undefined {
+  const filters: Record<string, ColumnFilter> = {}
+  for (const [key, filter] of Object.entries(state.filters)) {
+    if (isFilterActive(filter)) filters[key] = filter
+  }
+
+  if (Object.keys(filters).length === 0 && !state.sort) return undefined
+
+  return JSON.stringify({ filters, sort: state.sort })
+}

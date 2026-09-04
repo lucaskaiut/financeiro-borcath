@@ -2,6 +2,7 @@
 
 namespace App\Modules\Report\Http\Controllers;
 
+use App\Modules\Report\Services\ReportColumnQuery;
 use App\Modules\Report\Services\ReportService;
 use App\Modules\Shared\Http\Controllers\ApiController;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ class ReportController extends ApiController
         return $this->success($this->service->daily(
             $request->string('date')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
     }
 
@@ -25,6 +27,7 @@ class ReportController extends ApiController
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
     }
 
@@ -43,6 +46,7 @@ class ReportController extends ApiController
         return $this->service->dailyExport(
             $request->string('date')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         );
     }
 
@@ -52,6 +56,7 @@ class ReportController extends ApiController
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         );
     }
 
@@ -71,6 +76,7 @@ class ReportController extends ApiController
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
     }
 
@@ -78,6 +84,7 @@ class ReportController extends ApiController
     {
         return $this->success($this->service->byCostCenter(
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
     }
 
@@ -87,6 +94,7 @@ class ReportController extends ApiController
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         );
     }
 
@@ -112,6 +120,7 @@ class ReportController extends ApiController
     {
         return $this->service->byCostCenterExport(
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         );
     }
 
@@ -122,6 +131,7 @@ class ReportController extends ApiController
             $request->string('to')->toString() ?: null,
             (int) $request->integer('days', 30),
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         );
     }
 
@@ -134,6 +144,7 @@ class ReportController extends ApiController
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
             $selectedIds,
+            $this->columnQuery($request),
         );
     }
 
@@ -144,6 +155,7 @@ class ReportController extends ApiController
             $request->string('to')->toString() ?: null,
             (int) $request->integer('days', 30),
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
     }
 
@@ -153,6 +165,15 @@ class ReportController extends ApiController
             $request->string('from')->toString() ?: null,
             $request->string('to')->toString() ?: null,
             $request->string('cost_center_id')->toString() ?: null,
+            $this->columnQuery($request),
         ));
+    }
+
+    /**
+     * @return array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null
+     */
+    private function columnQuery(Request $request): ?array
+    {
+        return ReportColumnQuery::parse($request->string('column_query')->toString() ?: null);
     }
 }

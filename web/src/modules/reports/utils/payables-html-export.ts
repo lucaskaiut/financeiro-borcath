@@ -41,11 +41,10 @@ export function buildPayablesExportReport(data: PayablesReport, selectedIds: Set
     }
   }
 
+  // Keep account insertion order from data.accounts (API column_query sort/filter).
   const groups = Array.from(groupsMap.values())
     .filter((group) => group.overdue.accounts.length > 0 || group.due_today.accounts.length > 0)
     .map((group) => {
-      group.overdue.accounts.sort(compareAccounts)
-      group.due_today.accounts.sort(compareAccounts)
       group.overdue.total = round2(group.overdue.total)
       group.due_today.total = round2(group.due_today.total)
       group.total_overdue = round2(group.total_overdue)
@@ -72,11 +71,6 @@ export function buildPayablesExportReport(data: PayablesReport, selectedIds: Set
     total_overdue: totalOverdue,
     total_paid_today: totalPaidToday,
   }
-}
-
-function compareAccounts(a: PayableAccount, b: PayableAccount): number {
-  const dateCompare = a.due_date.localeCompare(b.due_date)
-  return dateCompare !== 0 ? dateCompare : a.description.localeCompare(b.description, 'pt-BR')
 }
 
 function round2(value: number): number {

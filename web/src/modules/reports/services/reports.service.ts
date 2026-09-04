@@ -251,6 +251,16 @@ export interface ProvisionReport {
 
 type ReportExportParams = Record<string, string | number | undefined>
 
+export type ReportQueryParams = {
+  date?: string
+  from?: string
+  to?: string
+  days?: number
+  cost_center_id?: string
+  column_query?: string
+  selected_ids?: string
+}
+
 async function fetchExport(path: string, params: ReportExportParams, filename: string): Promise<void> {
   const response = await http.get<Blob>(path, {
     params,
@@ -261,21 +271,21 @@ async function fetchExport(path: string, params: ReportExportParams, filename: s
 }
 
 export const reportsService = {
-  async daily(params: { date?: string; cost_center_id?: string }): Promise<DailyReport> {
+  async daily(params: { date?: string; cost_center_id?: string; column_query?: string }): Promise<DailyReport> {
     const response = await http.get<ApiResponse<DailyReport>>('/reports/daily', { params })
     return response.data.data
   },
 
-  async dailyExport(params: { date?: string; cost_center_id?: string }): Promise<void> {
+  async dailyExport(params: { date?: string; cost_center_id?: string; column_query?: string }): Promise<void> {
     await fetchExport('/reports/daily/export', params, 'relatorio-diario.xlsx')
   },
 
-  async weekly(params: { from?: string; to?: string; cost_center_id?: string }): Promise<WeeklyReport> {
+  async weekly(params: { from?: string; to?: string; cost_center_id?: string; column_query?: string }): Promise<WeeklyReport> {
     const response = await http.get<ApiResponse<WeeklyReport>>('/reports/weekly', { params })
     return response.data.data
   },
 
-  async weeklyExport(params: { from?: string; to?: string; cost_center_id?: string }): Promise<void> {
+  async weeklyExport(params: { from?: string; to?: string; cost_center_id?: string; column_query?: string }): Promise<void> {
     await fetchExport('/reports/weekly/export', params, 'relatorio-semanal.xlsx')
   },
 
@@ -288,12 +298,12 @@ export const reportsService = {
     await fetchExport('/reports/provision/export', params, 'relatorio-provisao.xlsx')
   },
 
-  async byCategory(params: { from?: string; to?: string; cost_center_id?: string }): Promise<CategoryReport> {
+  async byCategory(params: { from?: string; to?: string; cost_center_id?: string; column_query?: string }): Promise<CategoryReport> {
     const response = await http.get<ApiResponse<CategoryReport>>('/reports/by-category', { params })
     return response.data.data
   },
 
-  async byCategoryExport(params: { from?: string; to?: string; cost_center_id?: string }): Promise<void> {
+  async byCategoryExport(params: { from?: string; to?: string; cost_center_id?: string; column_query?: string }): Promise<void> {
     await fetchExport('/reports/by-category/export', params, 'relatorio-por-categoria.xlsx')
   },
 
@@ -306,25 +316,37 @@ export const reportsService = {
     await fetchExport('/reports/monthly-summary/export', params, 'relatorio-resumo-mensal.xlsx')
   },
 
-  async byCostCenter(params?: { cost_center_id?: string }): Promise<{ rows: CostCenterReportRow[] }> {
+  async byCostCenter(params?: { cost_center_id?: string; column_query?: string }): Promise<{ rows: CostCenterReportRow[] }> {
     const response = await http.get<ApiResponse<{ rows: CostCenterReportRow[] }>>('/reports/by-cost-center', { params })
     return response.data.data
   },
 
-  async byCostCenterExport(params?: { cost_center_id?: string }): Promise<void> {
+  async byCostCenterExport(params?: { cost_center_id?: string; column_query?: string }): Promise<void> {
     await fetchExport('/reports/by-cost-center/export', params ?? {}, 'relatorio-por-centro-de-custo.xlsx')
   },
 
-  async cashFlow(params: { from?: string; to?: string; days?: number; cost_center_id?: string }): Promise<CashFlowStatement> {
+  async cashFlow(params: {
+    from?: string
+    to?: string
+    days?: number
+    cost_center_id?: string
+    column_query?: string
+  }): Promise<CashFlowStatement> {
     const response = await http.get<ApiResponse<CashFlowStatement>>('/reports/cash-flow', { params })
     return response.data.data
   },
 
-  async cashFlowExport(params: { from?: string; to?: string; days?: number; cost_center_id?: string }): Promise<void> {
+  async cashFlowExport(params: {
+    from?: string
+    to?: string
+    days?: number
+    cost_center_id?: string
+    column_query?: string
+  }): Promise<void> {
     await fetchExport('/reports/cash-flow/export', params, 'demonstrativo-fluxo-caixa.xlsx')
   },
 
-  async payables(params: { from?: string; to?: string; cost_center_id?: string }): Promise<PayablesReport> {
+  async payables(params: { from?: string; to?: string; cost_center_id?: string; column_query?: string }): Promise<PayablesReport> {
     const response = await http.get<ApiResponse<PayablesReport>>('/reports/payables', { params })
     return response.data.data
   },
@@ -334,6 +356,7 @@ export const reportsService = {
     to?: string
     cost_center_id?: string
     selected_ids?: string
+    column_query?: string
   }): Promise<void> {
     await fetchExport('/reports/payables/export', params, 'contas-a-pagar.xlsx')
   },

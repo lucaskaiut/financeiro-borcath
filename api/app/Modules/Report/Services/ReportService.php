@@ -25,7 +25,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function daily(?string $date = null, ?string $costCenterId = null): array
+    public function daily(?string $date = null, ?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $date = $date ? Carbon::parse($date) : now();
 
@@ -84,7 +84,7 @@ class ReportService
 
         $groups = $this->finalizeDailyGroups($groupsMap);
 
-        return [
+        return $this->applyDailyColumnQuery([
             'date' => $date->toDateString(),
             'payments' => $payments,
             'receipts' => $receipts,
@@ -92,7 +92,7 @@ class ReportService
             'total_paid' => round($totalPaid, 2),
             'total_received' => round($totalReceived, 2),
             'balance' => round($totalReceived - $totalPaid, 2),
-        ];
+        ], $columnQuery);
     }
 
     /**
@@ -100,7 +100,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function weekly(?string $from = null, ?string $to = null, ?string $costCenterId = null): array
+    public function weekly(?string $from = null, ?string $to = null, ?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $from = $from ? Carbon::parse($from)->startOfDay() : now()->startOfWeek();
         $to = $to ? Carbon::parse($to)->endOfDay() : now()->endOfWeek();
@@ -146,14 +146,14 @@ class ReportService
 
         $groups = $this->finalizeWeeklyGroups($groupsMap);
 
-        return [
+        return $this->applyWeeklyColumnQuery([
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'groups' => $groups,
             'total_paid' => round($totalPaid, 2),
             'total_received' => round($totalReceived, 2),
             'net_balance' => round($totalReceived - $totalPaid, 2),
-        ];
+        ], $columnQuery);
     }
 
     /**
@@ -462,7 +462,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function byCategory(?string $from = null, ?string $to = null, ?string $costCenterId = null): array
+    public function byCategory(?string $from = null, ?string $to = null, ?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $from = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
         $to = $to ? Carbon::parse($to)->endOfDay() : now()->endOfMonth();
@@ -514,13 +514,13 @@ class ReportService
 
         $groups = $this->finalizeCategoryGroups($groupsMap);
 
-        return [
+        return $this->applyCategoryColumnQuery([
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'expense' => $this->asList($expense),
             'groups' => $groups,
             'matrix' => $this->buildCategoryMatrix($settlements, $from, $to),
-        ];
+        ], $columnQuery);
     }
 
     /**
@@ -849,7 +849,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function byCostCenter(?string $costCenterId = null): array
+    public function byCostCenter(?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $costCenters = CostCenter::query()
             ->when($costCenterId, fn ($q) => $q->where('uuid', $costCenterId))
@@ -877,7 +877,7 @@ class ReportService
             ];
         }
 
-        return ['rows' => $rows];
+        return $this->applyCostCenterColumnQuery(['rows' => $rows], $columnQuery);
     }
 
     /**
@@ -885,7 +885,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function cashFlow(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null): array
+    public function cashFlow(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $realized = $this->cashFlow->realized($from, $to, $costCenterId, null);
         $projected = $this->cashFlow->projected(null, null, $days, $costCenterId);
@@ -905,7 +905,7 @@ class ReportService
             $groups = $this->cashFlowGroups($from, $to, $days);
         }
 
-        return [
+        return $this->applyCashFlowColumnQuery([
             'realized' => [
                 'from' => $realized['from'],
                 'to' => $realized['to'],
@@ -926,7 +926,7 @@ class ReportService
                 'expected_final_balance' => round($realized['final_balance'] + $projected['total_in'] - $projected['total_out'], 2),
             ],
             'groups' => $groups,
-        ];
+        ], $columnQuery);
     }
 
     /**
@@ -935,7 +935,7 @@ class ReportService
      *
      * @return array<string, mixed>
      */
-    public function payables(?string $from = null, ?string $to = null, ?string $costCenterId = null): array
+    public function payables(?string $from = null, ?string $to = null, ?string $costCenterId = null, ?array $columnQuery = null): array
     {
         $from = $from ? Carbon::parse($from)->startOfDay() : now()->startOfMonth();
         $to = $to ? Carbon::parse($to)->endOfDay() : now()->endOfDay();
@@ -994,7 +994,7 @@ class ReportService
             }
         }
 
-        return [
+        return $this->applyPayablesColumnQuery([
             'reference_date' => $todayString,
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
@@ -1005,16 +1005,16 @@ class ReportService
             'total_open' => round($totalOpen, 2),
             'total_overdue' => round($totalOverdue, 2),
             'count' => count($rows),
-        ];
+        ], $columnQuery);
     }
 
     /**
      * @param  list<string>  $selectedIds
      * @return array<string, mixed>
      */
-    public function payablesExport(?string $from = null, ?string $to = null, ?string $costCenterId = null, array $selectedIds = []): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function payablesExport(?string $from = null, ?string $to = null, ?string $costCenterId = null, array $selectedIds = [], ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->payables($from, $to, $costCenterId);
+        $data = $this->payables($from, $to, $costCenterId, $columnQuery);
         $exportGroups = $this->buildPayablesExportGroups($data['accounts'], $selectedIds, $data['reference_date']);
         $summary = $this->buildPayablesSummary($exportGroups, $data['reference_date']);
         $fromLabel = Carbon::parse($data['from'])->format('d/m/Y');
@@ -1253,9 +1253,7 @@ class ReportService
                 continue;
             }
 
-            usort($group['overdue']['accounts'], fn (array $a, array $b): int => strcmp($a['due_date'], $b['due_date']) ?: strcmp($a['description'], $b['description']));
-            usort($group['due_today']['accounts'], fn (array $a, array $b): int => strcmp($a['due_date'], $b['due_date']) ?: strcmp($a['description'], $b['description']));
-
+            // Preserves account order from column_query (filter/sort applied upstream).
             $group['overdue']['total'] = round((float) $group['overdue']['total'], 2);
             $group['due_today']['total'] = round((float) $group['due_today']['total'], 2);
             $group['total_overdue'] = round((float) $group['total_overdue'], 2);
@@ -1440,9 +1438,9 @@ class ReportService
         ]);
     }
 
-    public function dailyExport(?string $date = null, ?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function dailyExport(?string $date = null, ?string $costCenterId = null, ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->daily($date, $costCenterId);
+        $data = $this->daily($date, $costCenterId, $columnQuery);
         $dateLabel = Carbon::parse($data['date'])->format('d/m/Y');
         $costCenterLabel = $this->resolveCostCenterLabel($costCenterId);
 
@@ -1521,9 +1519,9 @@ class ReportService
         });
     }
 
-    public function weeklyExport(?string $from = null, ?string $to = null, ?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function weeklyExport(?string $from = null, ?string $to = null, ?string $costCenterId = null, ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->weekly($from, $to, $costCenterId);
+        $data = $this->weekly($from, $to, $costCenterId, $columnQuery);
         $fromLabel = Carbon::parse($data['from'])->format('d/m/Y');
         $toLabel = Carbon::parse($data['to'])->format('d/m/Y');
         $costCenterLabel = $this->resolveCostCenterLabel($costCenterId);
@@ -1578,9 +1576,9 @@ class ReportService
         });
     }
 
-    public function byCategoryExport(?string $from = null, ?string $to = null, ?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function byCategoryExport(?string $from = null, ?string $to = null, ?string $costCenterId = null, ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->byCategory($from, $to, $costCenterId);
+        $data = $this->byCategory($from, $to, $costCenterId, $columnQuery);
         $matrix = $data['matrix'];
         $fromLabel = Carbon::parse($data['from'])->format('d/m/Y');
         $toLabel = Carbon::parse($data['to'])->format('d/m/Y');
@@ -2024,9 +2022,9 @@ class ReportService
         $this->applyXlsxColumnWidths($sheet, $columnCount);
     }
 
-    public function byCostCenterExport(?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function byCostCenterExport(?string $costCenterId = null, ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->byCostCenter($costCenterId);
+        $data = $this->byCostCenter($costCenterId, $columnQuery);
         $costCenterLabel = $this->resolveCostCenterLabel($costCenterId);
 
         return $this->streamXlsx('relatorio-por-centro-de-custo.xlsx', 'Centros de custo', function (Worksheet $sheet) use ($data, $costCenterLabel): void {
@@ -2066,9 +2064,9 @@ class ReportService
         });
     }
 
-    public function cashFlowExport(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function cashFlowExport(?string $from = null, ?string $to = null, int $days = 30, ?string $costCenterId = null, ?array $columnQuery = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $data = $this->cashFlow($from, $to, $days, $costCenterId);
+        $data = $this->cashFlow($from, $to, $days, $costCenterId, $columnQuery);
         $fromLabel = Carbon::parse($data['realized']['from'])->format('d/m/Y');
         $toLabel = Carbon::parse($data['realized']['to'])->format('d/m/Y');
         $costCenterLabel = $this->resolveCostCenterLabel($costCenterId);
@@ -2124,4 +2122,270 @@ class ReportService
             );
         });
     }
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyDailyColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $accessors = [
+            'description' => fn (array $row) => $row['description'] ?? null,
+            'category' => fn (array $row) => $row['category'] ?? null,
+            'value' => fn (array $row) => $row['value'] ?? null,
+        ];
+
+        $groups = [];
+        $payments = [];
+        $receipts = [];
+        $totalPaid = 0.0;
+        $totalReceived = 0.0;
+
+        foreach ($data['groups'] as $group) {
+            $groupPayments = ReportColumnQuery::applyRows($group['payments'], $columnQuery, $accessors);
+            $groupReceipts = ReportColumnQuery::applyRows($group['receipts'], $columnQuery, $accessors);
+            $groupPaid = round(array_sum(array_column($groupPayments, 'value')), 2);
+            $groupReceived = round(array_sum(array_column($groupReceipts, 'value')), 2);
+
+            if (count($groupPayments) === 0 && count($groupReceipts) === 0) {
+                continue;
+            }
+
+            $groups[] = [
+                'cost_center' => $group['cost_center'],
+                'payments' => $groupPayments,
+                'receipts' => $groupReceipts,
+                'total_paid' => $groupPaid,
+                'total_received' => $groupReceived,
+                'balance' => round($groupReceived - $groupPaid, 2),
+            ];
+            $payments = [...$payments, ...$groupPayments];
+            $receipts = [...$receipts, ...$groupReceipts];
+            $totalPaid += $groupPaid;
+            $totalReceived += $groupReceived;
+        }
+
+        $data['groups'] = $groups;
+        $data['payments'] = $payments;
+        $data['receipts'] = $receipts;
+        $data['total_paid'] = round($totalPaid, 2);
+        $data['total_received'] = round($totalReceived, 2);
+        $data['balance'] = round($totalReceived - $totalPaid, 2);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyWeeklyColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $groups = ReportColumnQuery::applyRows($data['groups'], $columnQuery, [
+            'cost_center' => fn (array $row) => $row['cost_center'] ?? null,
+            'total_paid' => fn (array $row) => $row['total_paid'] ?? null,
+            'total_received' => fn (array $row) => $row['total_received'] ?? null,
+            'net_balance' => fn (array $row) => $row['net_balance'] ?? null,
+        ]);
+
+        $data['groups'] = $groups;
+        $data['total_paid'] = round(array_sum(array_column($groups, 'total_paid')), 2);
+        $data['total_received'] = round(array_sum(array_column($groups, 'total_received')), 2);
+        $data['net_balance'] = round(array_sum(array_column($groups, 'net_balance')), 2);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyCategoryColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $accessors = [
+            'category' => fn (array $row) => $row['category'] ?? null,
+            'total' => fn (array $row) => $row['total'] ?? null,
+        ];
+
+        $groups = [];
+        $expenseMap = [];
+
+        foreach ($data['groups'] as $group) {
+            $expense = ReportColumnQuery::applyRows($group['expense'], $columnQuery, $accessors);
+            if (count($expense) === 0) {
+                continue;
+            }
+            $totalExpense = round(array_sum(array_column($expense, 'total')), 2);
+            $groups[] = [
+                'cost_center' => $group['cost_center'],
+                'expense' => $expense,
+                'total_expense' => $totalExpense,
+            ];
+            foreach ($expense as $row) {
+                $key = (string) $row['category'];
+                $expenseMap[$key] = round(($expenseMap[$key] ?? 0) + (float) $row['total'], 2);
+            }
+        }
+
+        $data['groups'] = $groups;
+        $data['expense'] = $this->asList($expenseMap);
+        $data['matrix'] = $this->applyCategoryMatrixColumnQuery($data['matrix'], $columnQuery);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $matrix
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyCategoryMatrixColumnQuery(array $matrix, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $matrix;
+        }
+
+        $accessors = [
+            'category' => fn (array $row) => $row['category'] ?? null,
+            'total' => fn (array $row) => $row['subtotal']['total'] ?? null,
+        ];
+
+        $groups = [];
+        foreach ($matrix['groups'] as $group) {
+            $categories = ReportColumnQuery::applyRows($group['categories'], $columnQuery, $accessors);
+            if (count($categories) === 0) {
+                continue;
+            }
+
+            $amountKeys = array_keys($group['subtotal']['amounts']);
+            $amounts = [];
+            foreach ($amountKeys as $key) {
+                $amounts[$key] = round(array_sum(array_map(fn ($category) => (float) ($category['subtotal']['amounts'][$key] ?? 0), $categories)), 2);
+            }
+            $total = round(array_sum(array_map(fn ($category) => (float) $category['subtotal']['total'], $categories)), 2);
+
+            $groups[] = [
+                'cost_center' => $group['cost_center'],
+                'categories' => $categories,
+                'subtotal' => ['amounts' => $amounts, 'total' => $total],
+            ];
+        }
+
+        $amountKeys = array_column($matrix['columns'], 'key');
+        $grandAmounts = [];
+        foreach ($amountKeys as $key) {
+            $grandAmounts[$key] = round(array_sum(array_map(fn ($group) => (float) ($group['subtotal']['amounts'][$key] ?? 0), $groups)), 2);
+        }
+        $grandTotal = round(array_sum(array_map(fn ($group) => (float) $group['subtotal']['total'], $groups)), 2);
+
+        $matrix['groups'] = $groups;
+        $matrix['grand_total'] = ['amounts' => $grandAmounts, 'total' => $grandTotal];
+
+        return $matrix;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyCostCenterColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $data['rows'] = ReportColumnQuery::applyRows($data['rows'], $columnQuery, [
+            'cost_center' => fn (array $row) => $row['cost_center'] ?? null,
+            'initial_balance' => fn (array $row) => $row['initial_balance'] ?? null,
+            'income' => fn (array $row) => $row['income'] ?? null,
+            'expense' => fn (array $row) => $row['expense'] ?? null,
+            'balance' => fn (array $row) => $row['balance'] ?? null,
+        ]);
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyCashFlowColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $groups = ReportColumnQuery::applyRows($data['groups'], $columnQuery, [
+            'cost_center' => fn (array $row) => $row['cost_center'] ?? null,
+            'realized_net' => fn (array $row) => $row['realized_net'] ?? null,
+            'projected_net' => fn (array $row) => $row['projected_net'] ?? null,
+            'expected_final_balance' => fn (array $row) => $row['expected_final_balance'] ?? null,
+        ]);
+
+        $data['groups'] = $groups;
+        $data['comparative'] = [
+            'realized_net' => round(array_sum(array_column($groups, 'realized_net')), 2),
+            'projected_net' => round(array_sum(array_column($groups, 'projected_net')), 2),
+            'expected_final_balance' => round(array_sum(array_column($groups, 'expected_final_balance')), 2),
+        ];
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array{filters: array<string, array<string, mixed>>, sort: array{key: string, direction: string}|null}|null  $columnQuery
+     * @return array<string, mixed>
+     */
+    private function applyPayablesColumnQuery(array $data, ?array $columnQuery): array
+    {
+        if ($columnQuery === null) {
+            return $data;
+        }
+
+        $rows = ReportColumnQuery::applyRows($data['accounts'], $columnQuery, [
+            'due_date' => fn (array $row) => $row['due_date'] ?? null,
+            'description' => fn (array $row) => $row['description'] ?? null,
+            'counterparty' => fn (array $row) => $row['counterparty'] ?? null,
+            'category' => fn (array $row) => $row['category'] ?? null,
+            'installment' => fn (array $row) => $row['installment'] ?? null,
+            'remaining_amount' => fn (array $row) => $row['remaining_amount'] ?? null,
+            'status' => fn (array $row) => $row['status'] ?? null,
+        ]);
+
+        $totalOpen = 0.0;
+        $totalOverdue = 0.0;
+        foreach ($rows as $row) {
+            $totalOpen += (float) $row['remaining_amount'];
+            if (! empty($row['is_overdue']) || ! empty($row['is_due_today'])) {
+                $totalOverdue += (float) $row['remaining_amount'];
+            }
+        }
+
+        $data['accounts'] = $rows;
+        $data['groups'] = $this->payablesListingGroups($rows);
+        $data['total_open'] = round($totalOpen, 2);
+        $data['total_overdue'] = round($totalOverdue, 2);
+        $data['count'] = count($rows);
+
+        return $data;
+    }
+
+
 }
