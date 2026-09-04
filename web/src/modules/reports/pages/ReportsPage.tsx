@@ -189,36 +189,40 @@ function DailySection() {
   })
 
   const dailyPdfSections = dailyGroups.flatMap((group) => {
-    const sections = []
+    const sections: Parameters<typeof buildReportHtml>[0]['sections'] = [
+      { title: group.cost_center, hideHeader: true, headers: movementHeaders, rows: [] },
+    ]
 
     if (group.payments.length > 0) {
       sections.push({
-        title: `${group.cost_center} · Pagamentos`,
+        subtitle: 'Pagamentos realizados',
         headers: movementHeaders,
         rows: movementRows(group.payments),
         amountColumns: [2],
-        footer: { label: 'Total pago', value: formatCurrency(group.total_paid) },
+        mutedHeader: true,
       })
     }
 
     if (group.receipts.length > 0) {
       sections.push({
-        title: `${group.cost_center} · Recebimentos`,
+        subtitle: 'Recebimentos realizados',
         headers: movementHeaders,
         rows: movementRows(group.receipts),
         amountColumns: [2],
-        footer: { label: 'Total recebido', value: formatCurrency(group.total_received) },
+        mutedHeader: true,
       })
     }
 
-    if (group.payments.length > 0 || group.receipts.length > 0) {
-      sections.push({
-        title: `${group.cost_center} · Saldo do centro`,
-        headers: movementHeaders,
-        rows: [],
-        footer: { label: 'Saldo', value: formatCurrency(group.balance) },
-      })
-    }
+    sections.push({
+      hideHeader: true,
+      headers: movementHeaders,
+      rows: [],
+      footers: [
+        { label: 'Total pago', value: formatCurrency(group.total_paid), variant: 'footer' },
+        { label: 'Total recebido', value: formatCurrency(group.total_received), variant: 'footer' },
+        { label: 'Saldo do centro', value: formatCurrency(group.balance), variant: 'footer' },
+      ],
+    })
 
     return sections
   })
@@ -256,12 +260,13 @@ function DailySection() {
                       'Relatório diário',
                       buildReportHtml({
                         title: 'Relatório diário',
-                        subtitle: `Data: ${formatDate(date)} · ${costCenterLabel}`,
+                        metaLines: [`Data: ${formatDate(date)}`, `Centro de custo: ${costCenterLabel}`],
                         sections: dailyPdfSections,
-                        summary: [
-                          { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-                          { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-                          { label: 'Saldo do dia', value: formatCurrency(query.data?.balance ?? 0) },
+                        totalColumns: 3,
+                        totalRows: [
+                          { label: 'Total geral pago', value: formatCurrency(query.data?.total_paid ?? 0), variant: 'total-grand' },
+                          { label: 'Total geral recebido', value: formatCurrency(query.data?.total_received ?? 0), variant: 'total-grand' },
+                          { label: 'Saldo geral do dia', value: formatCurrency(query.data?.balance ?? 0), variant: 'total-grand' },
                         ],
                       }),
                     )
@@ -364,18 +369,31 @@ function WeeklySection() {
                     'Relatório semanal',
                     buildReportHtml({
                       title: 'Relatório semanal',
-                      subtitle: `Período: ${periodLabel} · ${costCenterLabel}`,
-                      sections: weeklyGroups.map((group) => ({
-                        title: group.cost_center,
-                        headers: ['Total pago', 'Total recebido', 'Saldo líquido'],
-                        rows: [[formatCurrency(group.total_paid), formatCurrency(group.total_received), formatCurrency(group.net_balance)]],
-                        amountColumns: [0, 1, 2],
-                        footer: { label: 'Saldo do centro', value: formatCurrency(group.net_balance) },
-                      })),
-                      summary: [
-                        { label: 'Total pago', value: formatCurrency(query.data?.total_paid ?? 0) },
-                        { label: 'Total recebido', value: formatCurrency(query.data?.total_received ?? 0) },
-                        { label: 'Saldo líquido', value: formatCurrency(query.data?.net_balance ?? 0) },
+                      metaLines: [`Período: ${periodLabel}`, `Centro de custo: ${costCenterLabel}`],
+                      sections: [
+                        {
+                          headers: ['Centro de custo', 'Total pago', 'Total recebido', 'Saldo líquido'],
+                          rows: weeklyGroups.map((group) => [
+                            group.cost_center,
+                            formatCurrency(group.total_paid),
+                            formatCurrency(group.total_received),
+                            formatCurrency(group.net_balance),
+                          ]),
+                          amountColumns: [1, 2, 3],
+                          labelBold: true,
+                        },
+                      ],
+                      totalColumns: 4,
+                      totalRows: [
+                        {
+                          label: 'Total geral',
+                          values: [
+                            formatCurrency(query.data?.total_paid ?? 0),
+                            formatCurrency(query.data?.total_received ?? 0),
+                            formatCurrency(query.data?.net_balance ?? 0),
+                          ],
+                          variant: 'total-grand',
+                        },
                       ],
                     }),
                   )
@@ -457,7 +475,7 @@ function ProvisionSection() {
   const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
   const periodFrom = data?.from ?? from
   const periodTo = data?.to ?? to
-  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · ${costCenterLabel}`
+  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · Centro de custo: ${costCenterLabel}`
 
   const exportProvisionPdf = () => {
     if (!data) return
@@ -568,7 +586,7 @@ function CategorySection() {
 
     printHtmlReport(
       'Relatório por categoria',
-      buildCategoryMatrixHtml(matrix, 'Relatório por categoria', `Período: ${periodLabel} · ${costCenterLabel}`),
+      buildCategoryMatrixHtml(matrix, 'Relatório por categoria', `Período: ${periodLabel} · Centro de custo: ${costCenterLabel}`),
     )
   }
 
@@ -650,7 +668,7 @@ function MonthlySummarySection() {
   const exportParams = { from: from || undefined, to: to || undefined, cost_center_id: costCenterId || undefined }
   const periodFrom = data?.from ?? from
   const periodTo = data?.to ?? to
-  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · ${costCenterLabel}`
+  const subtitle = `Período: ${formatDate(periodFrom)} até ${formatDate(periodTo)} · Centro de custo: ${costCenterLabel}`
   const hasData = (data?.rows.length ?? 0) > 0
 
   const exportMonthlySummaryPdf = () => {
@@ -791,21 +809,20 @@ function CostCenterSection() {
                     'Relatório por centro de custo',
                     buildReportHtml({
                       title: 'Relatório por centro de custo',
-                      subtitle: costCenterLabel,
+                      metaLines: [`Centro de custo: ${costCenterLabel}`],
                       sections: [
-                        ...rows.map((row) => ({
-                          title: row.cost_center,
+                        {
                           headers: costCenterHeaders,
-                          rows: [[row.cost_center, formatCurrency(row.initial_balance), formatCurrency(row.income), formatCurrency(row.expense), formatCurrency(row.balance)]],
+                          rows: rows.map((row) => [
+                            row.cost_center,
+                            formatCurrency(row.initial_balance),
+                            formatCurrency(row.income),
+                            formatCurrency(row.expense),
+                            formatCurrency(row.balance),
+                          ]),
                           amountColumns: [1, 2, 3, 4],
-                          footer: { label: 'Saldo do centro', value: formatCurrency(row.balance) },
-                        })),
-                      ],
-                      summary: [
-                        { label: 'Saldo inicial total', value: formatCurrency(grandTotals.initial) },
-                        { label: 'Entradas totais', value: formatCurrency(grandTotals.income) },
-                        { label: 'Saídas totais', value: formatCurrency(grandTotals.expense) },
-                        { label: 'Saldo total', value: formatCurrency(grandTotals.balance) },
+                          labelBold: true,
+                        },
                       ],
                     }),
                   )
@@ -940,19 +957,46 @@ function CashFlowSection() {
                     'Demonstrativo de fluxo de caixa',
                     buildReportHtml({
                       title: 'Demonstrativo de fluxo de caixa',
-                      subtitle: `Período: ${formatDate(query.data!.realized.from)} até ${formatDate(query.data!.realized.to)} · Projeção ${days} dias · ${costCenterLabel}`,
-                      sections: cashFlowGroups.map((group) => ({
-                        title: group.cost_center,
-                        headers: ['Resultado realizado', 'Resultado projetado', 'Saldo final esperado'],
-                        rows: [[formatCurrency(group.realized_net), formatCurrency(group.projected_net), formatCurrency(group.expected_final_balance)]],
-                        amountColumns: [0, 1, 2],
-                        footer: { label: 'Saldo final esperado', value: formatCurrency(group.expected_final_balance) },
-                      })),
-                      summary: query.data
+                      metaLines: [
+                        `Período: ${formatDate(query.data!.realized.from)} até ${formatDate(query.data!.realized.to)}`,
+                        `Projeção: ${days} dias · Centro de custo: ${costCenterLabel}`,
+                      ],
+                      sections: [
+                        {
+                          headers: [
+                            'Centro de custo',
+                            'Resultado realizado',
+                            'Resultado projetado',
+                            'Saldo final esperado',
+                            'Entradas',
+                            'Saídas',
+                          ],
+                          rows: cashFlowGroups.map((group) => [
+                            group.cost_center,
+                            formatCurrency(group.realized_net),
+                            formatCurrency(group.projected_net),
+                            formatCurrency(group.expected_final_balance),
+                            formatCurrency(group.total_in),
+                            formatCurrency(group.total_out),
+                          ]),
+                          amountColumns: [1, 2, 3, 4, 5],
+                          labelBold: true,
+                        },
+                      ],
+                      totalColumns: 6,
+                      totalRows: query.data
                         ? [
-                            { label: 'Resultado realizado', value: formatCurrency(query.data.comparative.realized_net) },
-                            { label: 'Resultado projetado', value: formatCurrency(query.data.comparative.projected_net) },
-                            { label: 'Saldo final esperado', value: formatCurrency(query.data.comparative.expected_final_balance) },
+                            {
+                              label: 'Total geral',
+                              values: [
+                                formatCurrency(query.data.comparative.realized_net),
+                                formatCurrency(query.data.comparative.projected_net),
+                                formatCurrency(query.data.comparative.expected_final_balance),
+                                formatCurrency(query.data.realized.total_in + query.data.projected.total_in),
+                                formatCurrency(query.data.realized.total_out + query.data.projected.total_out),
+                              ],
+                              variant: 'total-grand',
+                            },
                           ]
                         : undefined,
                     }),
@@ -1068,8 +1112,12 @@ function PayablesSection() {
   }
 
   const exportSubtitle = data
-    ? `Referência: ${formatShortDate(data.reference_date)} · Período: ${formatShortDate(data.from)} até ${formatShortDate(data.to)} · ${costCenterLabel}`
-    : costCenterLabel
+    ? [
+        `Período: ${formatShortDate(data.from)} até ${formatShortDate(data.to)}`,
+        `Centro de custo: ${costCenterLabel}`,
+        `Referência: ${formatShortDate(data.reference_date)}`,
+      ].join(' · ')
+    : `Centro de custo: ${costCenterLabel}`
 
   const exportPayablesPdf = () => {
     if (!data) return

@@ -206,7 +206,8 @@ export default function AccountsListPage() {
     {
       key: 'due_date',
       header: 'Vencimento',
-      render: (a) => <span className="text-muted">{formatDate(a.due_date)}</span>,
+      className: 'text-center',
+      render: (a) => <span className="inline-block text-muted tabular-nums">{formatDate(a.due_date)}</span>,
     },
     {
       key: 'paid_date',
