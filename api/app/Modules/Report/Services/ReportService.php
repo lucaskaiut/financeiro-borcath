@@ -1627,7 +1627,7 @@ class ReportService
                     $row++;
 
                     foreach ($category['subcategories'] as $subcategory) {
-                        $sheet->setCellValue("A{$row}", '    '.$subcategory['subcategory'].' - Totais');
+                        $sheet->setCellValue("A{$row}", '    '.$subcategory['subcategory']);
                         $subtotalCells = [];
 
                         foreach ($columnKeys as $key) {

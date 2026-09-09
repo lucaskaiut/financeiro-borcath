@@ -160,7 +160,7 @@ function SubcategoryRows({
     <>
       <tr className="border-b border-surface-3 bg-blue-50/80 font-semibold dark:bg-blue-950/20">
         <td className={cn('sticky left-0 z-10 bg-blue-50/95 pl-6 text-foreground dark:bg-blue-950/80', labelColumnClass, cellClass)}>
-          {subcategory.subcategory} - Totais
+          {subcategory.subcategory}
         </td>
         <AmountCells totals={subcategory.subtotal} matrix={matrix} cellClass={cellClass} />
       </tr>

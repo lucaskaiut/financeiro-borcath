@@ -46,7 +46,7 @@ export function buildCategoryMatrixHtml(matrix: CategoryMatrix, title: string, s
 
       for (const subcategory of category.subcategories) {
         sections.push(
-          totalRow(`${subcategory.subcategory} - Totais`, subcategory.subtotal, matrix, 'subtotal-row-soft', 4),
+          totalRow(subcategory.subcategory, subcategory.subtotal, matrix, 'subtotal-row-soft', 4),
         )
       }
     }
