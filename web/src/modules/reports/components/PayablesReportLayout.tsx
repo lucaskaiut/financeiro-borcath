@@ -208,12 +208,12 @@ function MobileSectionTitle({ label, tone }: { label: string; tone: 'danger' | '
 
 function MobileAccountCard({ account }: { account: PayableAccount }) {
   return (
-    <div className="border-b border-surface-3/60 px-3 py-2">
-      <p className="text-[11px] font-medium leading-snug text-foreground">{account.description}</p>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-[10px] tabular-nums text-muted">{formatShortDate(account.due_date)}</span>
-        <span className="text-[11px] font-medium tabular-nums text-foreground">{formatCurrency(account.remaining_amount)}</span>
-      </div>
+    <div className="flex items-center gap-3 border-b border-surface-3/60 px-3 py-2">
+      <span className="shrink-0 text-[11px] tabular-nums text-muted">{formatShortDate(account.due_date)}</span>
+      <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground">{account.description}</span>
+      <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
+        {formatCurrency(account.remaining_amount)}
+      </span>
     </div>
   )
 }
