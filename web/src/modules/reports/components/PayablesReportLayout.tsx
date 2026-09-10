@@ -134,7 +134,66 @@ function MobileLayout({
         </section>
       ))}
 
-      <GeneralSummary data={data} compact referenceDate={referenceDate} />
+      <MobileSummary data={data} referenceDate={referenceDate} />
+    </div>
+  )
+}
+
+function MobileSummary({ data, referenceDate }: { data: PayablesExportReport; referenceDate: string }) {
+  return (
+    <section className="rounded-xl border-2 border-surface-3 bg-surface-2/30 p-3">
+      <h3 className="mb-4 text-center text-xs font-bold uppercase text-foreground">
+        Resumo geral em {referenceDate}
+      </h3>
+
+      <div className="space-y-5">
+        <MobileSummaryBlock
+          title={data.summary.paid_today.title}
+          rows={data.summary.paid_today.rows}
+          totalLabel="TOTAL PAGOS"
+          total={data.summary.paid_today.total}
+          tone="success"
+        />
+        <MobileSummaryBlock
+          title={data.summary.overdue.title}
+          rows={data.summary.overdue.rows}
+          totalLabel="TOTAL EM ATRASO"
+          total={data.summary.overdue.total}
+          tone="danger"
+        />
+      </div>
+    </section>
+  )
+}
+
+function MobileSummaryBlock({
+  title,
+  rows,
+  totalLabel,
+  total,
+  tone,
+}: {
+  title: string
+  rows: Array<{ cost_center: string; amount: number }>
+  totalLabel: string
+  total: number
+  tone: 'danger' | 'success'
+}) {
+  const toneClass = tone === 'danger' ? 'text-danger' : 'text-success'
+
+  return (
+    <div>
+      <p className={cn('mb-2 text-[10px] font-bold uppercase', toneClass)}>{title}</p>
+      {rows.map((row) => (
+        <div key={row.cost_center} className="flex items-start justify-between gap-3 border-b border-surface-3/60 py-1.5">
+          <span className="min-w-0 flex-1 text-[11px] leading-snug text-foreground">{row.cost_center}</span>
+          <span className="shrink-0 text-[11px] tabular-nums text-foreground">{formatCurrency(row.amount)}</span>
+        </div>
+      ))}
+      <div className={cn('mt-1 flex items-center justify-between gap-3 py-1.5 font-bold', toneClass)}>
+        <span className="text-[10px] uppercase">{totalLabel}</span>
+        <span className="text-[11px] tabular-nums">{formatCurrency(total)}</span>
+      </div>
     </div>
   )
 }

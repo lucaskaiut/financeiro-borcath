@@ -82,12 +82,10 @@ export function PayablesReportViewer({ open, onClose, data, costCenterLabel }: P
       </Modal>
 
       {open && (
-        <div
-          ref={mobileCaptureRef}
-          style={{ position: 'fixed', left: '-9999px', top: 0, width: MOBILE_PRINT_WIDTH }}
-          aria-hidden="true"
-        >
-          <PayablesCaptureContent data={data} subtitle={subtitle} mobile />
+        <div style={{ position: 'fixed', left: '-9999px', top: 0 }} aria-hidden="true">
+          <div ref={mobileCaptureRef} style={{ width: MOBILE_PRINT_WIDTH }}>
+            <PayablesCaptureContent data={data} subtitle={subtitle} mobile />
+          </div>
         </div>
       )}
     </>
