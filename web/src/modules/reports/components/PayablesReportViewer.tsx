@@ -24,7 +24,7 @@ interface PayablesReportViewerProps {
   costCenterLabel: string
 }
 
-const MOBILE_PRINT_WIDTH = 390
+const MOBILE_PRINT_WIDTH = 700
 
 export function PayablesReportViewer({ open, onClose, data, costCenterLabel }: PayablesReportViewerProps) {
   const captureRef = useRef<HTMLDivElement>(null)
