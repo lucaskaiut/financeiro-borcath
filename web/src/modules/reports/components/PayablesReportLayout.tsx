@@ -5,16 +5,22 @@ import type { PayableAccount, PayablesExportReport } from '../services/reports.s
 interface PayablesReportLayoutProps {
   data: PayablesExportReport
   compact?: boolean
+  mobile?: boolean
   className?: string
 }
 
 const HEADERS = ['Data', 'Descrição', 'Valor'] as const
 const COL_WIDTHS = ['16%', '60%', '24%'] as const
 
-export function PayablesReportLayout({ data, compact = false, className }: PayablesReportLayoutProps) {
+export function PayablesReportLayout({ data, compact = false, mobile = false, className }: PayablesReportLayoutProps) {
+  const referenceDate = formatShortDate(data.reference_date)
+
+  if (mobile) {
+    return <MobileLayout data={data} referenceDate={referenceDate} className={className} />
+  }
+
   const cellClass = compact ? 'px-2 py-1 text-[11px]' : 'px-3 py-2 text-sm'
   const headerClass = compact ? 'px-2 py-1.5 text-[10px]' : 'px-3 py-2.5 text-xs'
-  const referenceDate = formatShortDate(data.reference_date)
 
   return (
     <div className={cn('space-y-8', className)}>
@@ -84,6 +90,82 @@ export function PayablesReportLayout({ data, compact = false, className }: Payab
       ))}
 
       <GeneralSummary data={data} compact={compact} referenceDate={referenceDate} />
+    </div>
+  )
+}
+
+function MobileLayout({
+  data,
+  referenceDate,
+  className,
+}: {
+  data: PayablesExportReport
+  referenceDate: string
+  className?: string
+}) {
+  return (
+    <div className={cn('space-y-6', className)}>
+      {data.groups.map((group) => (
+        <section key={group.cost_center}>
+          <div className="rounded-t-lg bg-surface-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-foreground">
+            {group.cost_center}
+          </div>
+          <div className="overflow-hidden rounded-b-lg border border-t-0 border-surface-3">
+            {group.overdue.accounts.length > 0 && (
+              <>
+                <MobileSectionTitle label="EM ATRASO" tone="danger" />
+                {group.overdue.accounts.map((account) => (
+                  <MobileAccountCard key={account.id} account={account} />
+                ))}
+                <MobileTotalRow label="TOTAL EM ATRASO" value={group.overdue.total} tone="danger" />
+              </>
+            )}
+
+            {group.due_today.accounts.length > 0 && (
+              <>
+                <MobileSectionTitle label={`PAGOS EM ${referenceDate}`} tone="success" />
+                {group.due_today.accounts.map((account) => (
+                  <MobileAccountCard key={account.id} account={account} />
+                ))}
+                <MobileTotalRow label="TOTAL PAGO" value={group.due_today.total} tone="success" />
+              </>
+            )}
+          </div>
+        </section>
+      ))}
+
+      <GeneralSummary data={data} compact referenceDate={referenceDate} />
+    </div>
+  )
+}
+
+function MobileSectionTitle({ label, tone }: { label: string; tone: 'danger' | 'success' }) {
+  return (
+    <div className={cn('px-3 pt-3 text-[11px] font-bold uppercase', tone === 'danger' ? 'text-danger' : 'text-success')}>
+      {label}
+    </div>
+  )
+}
+
+function MobileAccountCard({ account }: { account: PayableAccount }) {
+  return (
+    <div className="border-b border-surface-3/60 px-3 py-2">
+      <p className="text-[11px] font-medium leading-snug text-foreground">{account.description}</p>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="text-[10px] tabular-nums text-muted">{formatShortDate(account.due_date)}</span>
+        <span className="text-[11px] font-medium tabular-nums text-foreground">{formatCurrency(account.remaining_amount)}</span>
+      </div>
+    </div>
+  )
+}
+
+function MobileTotalRow({ label, value, tone }: { label: string; value: number; tone: 'danger' | 'success' }) {
+  const toneClass = tone === 'danger' ? 'text-danger' : 'text-success'
+
+  return (
+    <div className={cn('flex items-center justify-between gap-2 bg-surface-2/60 px-3 py-2 font-bold', toneClass)}>
+      <span className="text-[10px] uppercase">{label}</span>
+      <span className="text-[11px] tabular-nums">{formatCurrency(value)}</span>
     </div>
   )
 }
