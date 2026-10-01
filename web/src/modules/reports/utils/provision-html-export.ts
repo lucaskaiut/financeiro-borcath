@@ -11,59 +11,62 @@ function columnHeaderRow(headers: string[]): string {
   return `<tr class="column-header-muted">${headers
     .map(
       (header, index) =>
-        `<th class="${index === 0 ? '' : 'amount'}">${escapeHtml(header)}</th>`,
+        `<th class="${index === 0 ? '' : index === headers.length - 1 ? 'amount' : 'amount amount-center'}">${escapeHtml(header)}</th>`,
     )
+    .join('')}</tr>`
+}
+
+function sectionTable(banner: string, headers: string[], bodyRows: string[]): string {
+  return `<table class="report-table">
+    <thead>
+      <tr class="section-banner"><td colspan="${headers.length}">${escapeHtml(banner)}</td></tr>
+      ${columnHeaderRow(headers)}
+    </thead>
+    <tbody>
+      ${bodyRows.join('')}
+    </tbody>
+  </table>`
+}
+
+function dataRow(cells: string[]): string {
+  return `<tr>${cells
+    .map((value, index) => `<td class="${index === 0 ? '' : 'amount'}">${value}</td>`)
     .join('')}</tr>`
 }
 
 export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, subtitle: string): string {
   const headers = ['Conta', ...data.columns.map((column) => column.label), 'Total']
-  const sections: string[] = []
+  const tables: string[] = []
 
   for (const group of data.groups) {
-    sections.push(
-      `<tr class="section-banner"><td colspan="${headers.length}">${escapeHtml(group.cost_center)}</td></tr>`,
+    const bodyRows = group.rows.map((row) =>
+      dataRow([escapeHtml(row.description), ...data.columns.map((column) => cell(row.amounts[column.key])), '']),
     )
-    sections.push(columnHeaderRow(headers))
 
-    for (const row of group.rows) {
-      const cells = [escapeHtml(row.description), ...data.columns.map((column) => cell(row.amounts[column.key])), '']
-
-      sections.push(
-        `<tr>${cells
-          .map((value, index) => `<td class="${index === 0 ? '' : 'amount'}">${value}</td>`)
-          .join('')}</tr>`,
-      )
-    }
-
-    const subtotalCells = [
-      'Subtotal',
-      ...data.columns.map((column) => cell(group.subtotal.amounts[column.key])),
-      cell(group.subtotal.total),
-    ]
-
-    sections.push(
-      `<tr class="subtotal-row">${subtotalCells
+    bodyRows.push(
+      `<tr class="subtotal-row">${[
+        'Subtotal',
+        ...data.columns.map((column) => cell(group.subtotal.amounts[column.key])),
+        cell(group.subtotal.total),
+      ]
         .map((value, index) => `<td class="${index === 0 ? '' : 'amount'}">${value}</td>`)
         .join('')}</tr>`,
     )
-    sections.push(`<tr class="spacer"><td colspan="${headers.length}"></td></tr>`)
+
+    tables.push(sectionTable(group.cost_center, headers, bodyRows))
   }
 
-  sections.push(`<tr class="section-banner"><td colspan="${headers.length}">TOTAL GERAL</td></tr>`)
-  sections.push(columnHeaderRow(headers))
-
-  const grandCells = [
-    'Total geral',
-    ...data.columns.map((column) => cell(data.grand_total.amounts[column.key])),
-    cell(data.grand_total.total),
-  ]
-
-  sections.push(
-    `<tr class="total-row-grand">${grandCells
+  const grandRows = [
+    `<tr class="total-row-grand">${[
+      'Total geral',
+      ...data.columns.map((column) => cell(data.grand_total.amounts[column.key])),
+      cell(data.grand_total.total),
+    ]
       .map((value, index) => `<td class="${index === 0 ? '' : 'amount'}">${value}</td>`)
       .join('')}</tr>`,
-  )
+  ]
+
+  tables.push(sectionTable('TOTAL GERAL', headers, grandRows))
 
   const subtitleLines = subtitle
     .split(' · ')
@@ -76,10 +79,6 @@ export function buildProvisionMatrixHtml(data: ProvisionReport, title: string, s
     <h1 class="report-title">${escapeHtml(title)}</h1>
     ${subtitleLines.map((line) => `<p class="report-subtitle">${escapeHtml(line)}</p>`).join('')}
     <p class="report-summary-line">${escapeHtml(summaryLine)}</p>
-    <table class="report-table">
-      <tbody>
-        ${sections.join('')}
-      </tbody>
-    </table>
+    ${tables.join('')}
   `
 }

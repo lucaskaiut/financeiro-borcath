@@ -82,7 +82,7 @@ function ColumnHeaderRow({
         Conta
       </th>
       {columns.map((column) => (
-        <th key={column.key} className={cn('whitespace-nowrap text-right font-semibold', amountColumnClass, headerClass)}>
+        <th key={column.key} className={cn('whitespace-nowrap text-center font-semibold', amountColumnClass, headerClass)}>
           {column.label}
         </th>
       ))}

@@ -73,7 +73,7 @@ export function buildCategoryMatrixHtml(matrix: CategoryMatrix, title: string, s
         <tr class="column-header">${headers
           .map(
             (header, index) =>
-              `<th class="${index === 0 ? '' : index === headers.length - 1 ? 'amount amount-danger' : 'amount'}">${escapeHtml(header)}</th>`,
+              `<th class="${index === 0 ? '' : index === headers.length - 1 ? 'amount amount-danger' : 'amount amount-center'}">${escapeHtml(header)}</th>`,
           )
           .join('')}</tr>
       </thead>

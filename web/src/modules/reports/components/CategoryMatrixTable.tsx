@@ -32,7 +32,7 @@ export function CategoryMatrixTable({ matrix, compact = false, className }: Cate
               <th
                 key={column.key}
                 className={cn(
-                  'whitespace-nowrap text-right font-semibold tracking-wide text-muted uppercase',
+                  'whitespace-nowrap text-center font-semibold tracking-wide text-muted uppercase',
                   headerClass,
                 )}
               >

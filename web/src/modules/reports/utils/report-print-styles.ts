@@ -84,6 +84,10 @@ export const REPORT_PRINT_STYLES = `
     font-variant-numeric: tabular-nums;
   }
 
+  table.report-table th.amount-center {
+    text-align: center;
+  }
+
   table.report-table td.label-bold,
   table.report-table .label-bold {
     font-weight: 700;

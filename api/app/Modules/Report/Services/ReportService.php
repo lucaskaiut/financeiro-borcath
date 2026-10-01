@@ -207,6 +207,7 @@ class ReportService
                 $groupHeaderRow = $row;
                 $sheet->fromArray($headers, null, "A{$row}");
                 $this->applyXlsxColumnHeader($sheet, $groupHeaderRow, $columnCount, 'FFF3F4F6');
+                $this->centerXlsxColumnHeaderRange($sheet, $groupHeaderRow, $columnCount);
                 $row++;
 
                 $dataStartRow = $row;
@@ -243,6 +244,7 @@ class ReportService
             $grandHeaderRow = $row;
             $sheet->fromArray($headers, null, "A{$row}");
             $this->applyXlsxColumnHeader($sheet, $grandHeaderRow, $columnCount, 'FFF3F4F6');
+            $this->centerXlsxColumnHeaderRange($sheet, $grandHeaderRow, $columnCount);
             $row++;
 
             $grandCells = ['Total geral'];
@@ -441,6 +443,12 @@ class ReportService
             fn (array $row): float => $row['amount'] < 0 ? $row['amount'] : 0.0,
             $rawRows,
         ))), 2);
+
+        $activeDayKeys = array_flip(array_column($rawRows, 'due_date'));
+        $columns = array_values(array_filter(
+            $columns,
+            fn (array $column): bool => isset($activeDayKeys[$column['key']]),
+        ));
 
         return [
             'from' => $fromDate->toDateString(),
@@ -1604,6 +1612,7 @@ class ReportService
             $headers = array_merge(['Descrição'], $columnLabels, ['Total geral']);
             $sheet->fromArray($headers, null, "A{$headerRow}");
             $this->applyXlsxColumnHeader($sheet, $headerRow, $columnCount);
+            $this->centerXlsxColumnHeaderRange($sheet, $headerRow, $columnCount);
 
             $row = $headerRow + 1;
             $dataStartRow = $row;
@@ -1835,6 +1844,21 @@ class ReportService
         if ($columnCount > 1) {
             $sheet->getStyle("B{$row}:{$lastColumn}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }
+    }
+
+    /**
+     * Centers the inner (non-label, non-total) column headers, e.g. months and dates.
+     */
+    private function centerXlsxColumnHeaderRange(Worksheet $sheet, int $row, int $columnCount): void
+    {
+        if ($columnCount <= 2) {
+            return;
+        }
+
+        $lastCenteredColumn = $this->xlsxColumnLetter($columnCount - 1);
+        $sheet->getStyle("B{$row}:{$lastCenteredColumn}{$row}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER);
     }
 
     private function applyXlsxSectionBanner(Worksheet $sheet, int $row, int $columnCount): void
